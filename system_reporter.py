@@ -1,7 +1,7 @@
 import requests
 
 # This points to your Next.js dashboard
-DASHBOARD_URL = "http://localhost:3000/api/webhooks/openclaw"
+DASHBOARD_URL = "https://oc-sl-system.vercel.app/api/webhooks/openclaw"
 SECRET_KEY = "AarizScorpio18112009"
 
 def report_to_system(agent_id: str, status: str, progress: int, current_task: str):
