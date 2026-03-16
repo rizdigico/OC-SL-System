@@ -678,9 +678,10 @@ interface GuildMetricsProps {
 export function GuildMetrics({ isPenaltyZone = false, liveAgents = {} }: GuildMetricsProps) {
     const [activeGuild, setActiveGuild] = useState<Guild>("Business");
     const ac = GUILDS.find(g => g.id === activeGuild)!.color;
-    const hasLiveData = Object.values(liveAgents).some(a => a.status === "EXECUTING");
+    // Mirror useAgentState's definition: live once ANY agent has reported, not just EXECUTING
+    const hasLiveData = Object.keys(liveAgents).length > 0;
 
-    console.log("[UI RENDER] Current liveAgents State:", liveAgents);
+    console.log("[GuildMetrics] liveAgents keys:", Object.keys(liveAgents), "| hasLiveData:", hasLiveData);
 
     return (
         <div className="flex flex-col gap-4">

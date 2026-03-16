@@ -14,13 +14,15 @@ import { useAgentState } from "@/hooks/useAgentState";
 // ── Dummy Data ────────────────────────────────────────────────────────────────
 
 interface DummyAgent {
-    id:     string;
-    name:   string;
-    rank:   string;
-    status: "Executing" | "Idle" | "Success" | "Failed" | "Offline";
-    task:   string;
-    sr:     number;
-    tasks:  number;
+    id:       string;
+    name:     string;
+    rank:     string;
+    status:   "Executing" | "Idle" | "Success" | "Failed" | "Offline";
+    task:     string;
+    sr:       number;
+    tasks:    number;
+    /** Live task completion progress 0–100. Undefined = use mock sr bar instead. */
+    progress?: number;
 }
 
 const DUMMY_AGENTS: DummyAgent[] = [
@@ -148,16 +150,22 @@ function AgentCard({ agent }: { agent: DummyAgent }) {
                 <span className="text-[9px] font-bold tracking-widest" style={{ color: cfg.color }}>
                     {cfg.label}
                 </span>
-                <span className="text-[9px] text-zinc-600 ml-auto">{agent.sr}% SR</span>
+                {agent.progress !== undefined ? (
+                    <span className="text-[9px] tabular-nums ml-auto" style={{ color: cfg.color }}>
+                        {agent.progress}% done
+                    </span>
+                ) : (
+                    <span className="text-[9px] text-zinc-600 ml-auto">{agent.sr}% SR</span>
+                )}
                 <span className="text-[9px] text-zinc-700">{agent.tasks.toLocaleString()} tasks</span>
             </div>
 
-            {/* Success rate bar */}
+            {/* Progress bar: live task completion when available, sr otherwise */}
             <div className="mt-2 h-0.5 bg-zinc-900 rounded-full ml-4 overflow-hidden">
                 <div
                     className="h-full rounded-full"
                     style={{
-                        width:      `${agent.sr}%`,
+                        width:      `${agent.progress ?? agent.sr}%`,
                         background: `linear-gradient(90deg, ${cfg.color}50, ${cfg.color})`,
                     }}
                 />
@@ -188,12 +196,14 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
         COMPLETED: "Success",
     };
     const mergedAgents: DummyAgent[] = DUMMY_AGENTS.map(dummy => {
-        const live = agents[dummy.id];
+        // Case-insensitive lookup so "BERU" and "beru" both match
+        const live = agents[dummy.id] ?? agents[dummy.id.toLowerCase()] ?? agents[dummy.id.toUpperCase()];
         if (!live) return dummy;
         return {
             ...dummy,
-            status: STATUS_MAP[live.status] ?? "Idle",
-            task:   live.currentTask,
+            status:   STATUS_MAP[live.status] ?? "Idle",
+            task:     live.currentTask,
+            progress: live.progress,
         };
     });
 
@@ -221,7 +231,7 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
         return () => clearTimeout(timeout);
     }, [initialized]);
 
-    console.log("[UI RENDER] Current liveAgents State:", agents);
+    console.log("[ThroneRoom] agents:", Object.keys(agents), "| hasLiveData:", hasLiveData, "| progress:", maxProgress);
     return (
         <div className="relative w-full min-h-[calc(100vh-120px)]">
 
