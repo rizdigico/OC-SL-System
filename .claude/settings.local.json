@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep -l \"interface\\\\|type\")",
+      "Bash(npm uninstall @react-three/fiber @react-three/drei three @react-three/rapier)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(echo \"EXIT:$?\")"
+    ]
+  }
+}

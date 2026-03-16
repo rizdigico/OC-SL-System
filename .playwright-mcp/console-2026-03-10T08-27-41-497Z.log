@@ -1,0 +1,12 @@
+[  450518ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:5000/api/users/me/penalty-status:0
+[  454605ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:5000/api/shop:0
+[  456987ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:5000/api/inventory:0
+[  456988ms] [ERROR] Failed to fetch inventory @ http://localhost:3000/_next/static/chunks/9e883_next_dist_e24ad472._.js:3127
+[  480516ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:5000/api/users/me/penalty-status:0
+[  510510ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:5000/api/users/me/penalty-status:0
+[  540512ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:5000/api/users/me/penalty-status:0
+[  570508ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:5000/api/users/me/penalty-status:0
+[  600526ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:5000/api/users/me/penalty-status:0
+[  630562ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:5000/api/users/me/penalty-status:0
+[  660518ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:5000/api/users/me/penalty-status:0
+[  690514ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:5000/api/users/me/penalty-status:0

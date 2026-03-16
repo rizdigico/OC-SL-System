@@ -1,0 +1,314 @@
+@import "tailwindcss";
+
+:root {
+  --background: #00030e;
+  --foreground: #e8f0ff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-system-black: #00030e;
+  --color-system-blue: #1e44ff;
+  --color-system-neon: #11D2EF;
+  --color-system-purple: #A480F2;
+  --color-system-green: #00e676;
+  --color-system-red: #ff3333;
+  --font-caros: var(--font-caros), ui-sans-serif, system-ui, sans-serif;
+  --font-lato: var(--font-lato), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-lato);
+  overflow-x: hidden;
+}
+
+/* ── Solo Leveling Design System ──────────────────────────────────────────── */
+
+/* Border glow pulse */
+@keyframes sl-glow-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 8px rgba(30, 68, 255, 0.4),
+      0 0 22px rgba(30, 68, 255, 0.15),
+      inset 0 0 30px rgba(10, 25, 100, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 16px rgba(30, 68, 255, 0.65),
+      0 0 40px rgba(30, 68, 255, 0.25),
+      inset 0 0 40px rgba(10, 25, 100, 0.4);
+  }
+}
+
+/* Scanning line sweep */
+@keyframes sl-scan {
+  0% { top: -2px; opacity: 0.6; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* ── Core Panel ─────────────────────────────────────────────────────────── */
+.sl-panel {
+  background-color: rgba(0, 3, 22, 0.94);
+  /* Circuit board / cracked glass texture via diagonal stripe layers */
+  background-image:
+    repeating-linear-gradient(
+      62deg,
+      transparent 0px,
+      transparent 22px,
+      rgba(30, 68, 200, 0.038) 22px,
+      rgba(30, 68, 200, 0.038) 23px
+    ),
+    repeating-linear-gradient(
+      -62deg,
+      transparent 0px,
+      transparent 35px,
+      rgba(30, 68, 200, 0.028) 35px,
+      rgba(30, 68, 200, 0.028) 36px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 70px,
+      rgba(30, 68, 200, 0.018) 70px,
+      rgba(30, 68, 200, 0.018) 71px
+    );
+  border: 1px solid rgba(40, 90, 255, 0.65);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+  animation: sl-glow-pulse 4s ease-in-out infinite;
+}
+
+/* Scanning line overlay on panels */
+.sl-panel::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(30, 100, 255, 0.25), transparent);
+  animation: sl-scan 8s linear infinite;
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* ── Corner Brackets ───────────────────────────────────────────────────── */
+.sl-corner-tl,
+.sl-corner-tr,
+.sl-corner-bl,
+.sl-corner-br {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: rgba(80, 150, 255, 0.95);
+  border-style: solid;
+  z-index: 10;
+  filter: drop-shadow(0 0 4px rgba(80, 150, 255, 0.8));
+}
+.sl-corner-tl { top: -1px; left: -1px;  border-width: 2px 0 0 2px; }
+.sl-corner-tr { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
+.sl-corner-bl { bottom: -1px; left: -1px;  border-width: 0 0 2px 2px; }
+.sl-corner-br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+/* ── Panel Header Bar ──────────────────────────────────────────────────── */
+.sl-panel-header {
+  background: rgba(0, 5, 35, 0.95);
+  border-bottom: 1px solid rgba(40, 90, 255, 0.4);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #ffffff;
+  font-size: 0.95rem;
+}
+
+/* ── Notification Header (the [!] + TITLE row) ─────────────────────────── */
+.sl-notif-icon {
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgba(100, 160, 255, 0.8);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(180, 210, 255, 0.95);
+  font-weight: 900;
+  font-size: 15px;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(80, 140, 255, 0.5);
+}
+
+/* ── HP / MP Bars ──────────────────────────────────────────────────────── */
+.sl-bar-track {
+  height: 10px;
+  background: rgba(0, 8, 40, 0.9);
+  border: 1px solid rgba(40, 90, 255, 0.35);
+  border-radius: 1px;
+  overflow: hidden;
+  flex: 1;
+}
+.sl-bar-fill-hp {
+  height: 100%;
+  background: linear-gradient(90deg, #1a3dff, #5599ff);
+  box-shadow: 0 0 8px rgba(50, 120, 255, 0.7);
+  transition: width 0.8s ease;
+}
+.sl-bar-fill-mp {
+  height: 100%;
+  background: linear-gradient(90deg, #0d88cc, #33bbff);
+  box-shadow: 0 0 8px rgba(30, 160, 220, 0.7);
+  transition: width 0.8s ease;
+}
+.sl-bar-fill-exp {
+  height: 100%;
+  background: linear-gradient(90deg, #1e44ff, #11D2EF);
+  box-shadow: 0 0 10px rgba(17, 210, 239, 0.6);
+  transition: width 1s ease-out;
+}
+
+/* ── SL Buttons ────────────────────────────────────────────────────────── */
+.sl-btn {
+  border: 1px solid rgba(40, 90, 255, 0.7);
+  background: rgba(10, 25, 80, 0.4);
+  color: #b0ccff;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  padding: 10px 18px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.sl-btn:hover {
+  background: rgba(30, 68, 200, 0.45);
+  border-color: rgba(80, 150, 255, 0.9);
+  color: #ddeeff;
+  box-shadow: 0 0 18px rgba(30, 68, 255, 0.5);
+}
+.sl-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.sl-btn-red {
+  border-color: rgba(200, 40, 40, 0.7);
+  background: rgba(80, 10, 10, 0.4);
+  color: #ffaaaa;
+}
+.sl-btn-red:hover {
+  background: rgba(180, 30, 30, 0.4);
+  border-color: rgba(255, 80, 80, 0.9);
+  color: #ffdddd;
+  box-shadow: 0 0 18px rgba(255, 50, 50, 0.5);
+}
+
+.sl-btn-purple {
+  border-color: rgba(164, 128, 242, 0.7);
+  background: rgba(60, 20, 120, 0.35);
+  color: #ccaaff;
+}
+.sl-btn-purple:hover {
+  background: rgba(100, 50, 200, 0.4);
+  border-color: rgba(200, 170, 255, 0.9);
+  color: #eeddff;
+  box-shadow: 0 0 18px rgba(164, 128, 242, 0.5);
+}
+
+/* ── Typography Utilities ──────────────────────────────────────────────── */
+.sl-text-buff   { color: #00e676; text-shadow: 0 0 6px rgba(0, 230, 118, 0.5); }
+.sl-text-danger { color: #ff3333; text-shadow: 0 0 6px rgba(255, 50, 50, 0.5); }
+.sl-text-title  { color: #ffffff; font-weight: 700; letter-spacing: 0.05em; }
+.sl-text-dim    { color: #7a9abf; }
+.sl-bracket     { color: #ffffff; font-weight: 700; }
+
+/* ── Rank Badge ────────────────────────────────────────────────────────── */
+.sl-rank-badge {
+  border: 1px solid rgba(164, 128, 242, 0.6);
+  background: rgba(60, 20, 120, 0.3);
+  color: #ccaaff;
+  font-weight: 800;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+
+/* ── Stat Row ──────────────────────────────────────────────────────────── */
+.sl-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(30, 68, 200, 0.12);
+}
+.sl-stat-label {
+  color: #7a9abf;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sl-stat-value {
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Divider ────────────────────────────────────────────────────────────── */
+.sl-divider {
+  border: none;
+  border-top: 1px solid rgba(40, 90, 255, 0.25);
+  margin: 0;
+}
+
+/* ── Screen shake (kept from original) ────────────────────────────────── */
+@keyframes screen-shake {
+  0%   { transform: translate(0, 0) }
+  10%  { transform: translate(-5px, -5px) }
+  20%  { transform: translate(5px, 5px) }
+  30%  { transform: translate(-5px, 5px) }
+  40%  { transform: translate(5px, -5px) }
+  50%  { transform: translate(-5px, -5px) }
+  60%  { transform: translate(5px, 5px) }
+  70%  { transform: translate(-5px, 5px) }
+  80%  { transform: translate(5px, -5px) }
+  90%  { transform: translate(-5px, -5px) }
+  100% { transform: translate(0, 0) }
+}
+.animate-screen-shake {
+  animation: screen-shake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+}
+
+/* ── Goal heading decoration ────────────────────────────────────────────── */
+.sl-goal-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ffffff;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  font-size: 0.95rem;
+  text-decoration: line-through;
+  text-decoration-color: rgba(40, 90, 255, 0.4);
+}
+.sl-goal-heading::before,
+.sl-goal-heading::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(40, 90, 255, 0.5), transparent);
+}

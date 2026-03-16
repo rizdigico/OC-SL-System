@@ -1,0 +1,7 @@
+Navigating to http://localhost:3000/dashboard...
+PAGE INFO: %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+PAGE LOG: [HMR] connected
+PAGE VERBOSE: [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o
+Navigation complete.
+DOM has rendered content successfully.
+Debug script finished.
