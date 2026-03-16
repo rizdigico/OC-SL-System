@@ -11,6 +11,13 @@ export const dynamic = "force-dynamic";
  *   Return the current snapshot of all known agents.
  *   Headers: Authorization: Bearer <OPENCLAW_SECRET>
  *
+ * Storage strategy:
+ *   - Redis (via REDIS_URL env var): used in production on Vercel
+ *   - In-memory agent-store: fallback for local dev (no Redis credentials)
+ *
+ * Redis hash key: "shadow_army_state"
+ *   Each field = agentId, value = JSON-serialised AgentPayload
+ *
  * To test from cURL:
  *   curl -X POST http://localhost:3000/api/webhooks/openclaw \
  *     -H "Authorization: Bearer SOVEREIGN_SECRET_KEY" \
@@ -19,16 +26,60 @@ export const dynamic = "force-dynamic";
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { upsertAgent, getState, AgentPayload } from "@/lib/agent-store";
+import { createClient }              from "redis";
+import { upsertAgent, getState, AgentPayload, AgentStateMap } from "@/lib/agent-store";
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-/** Reads from OPENCLAW_SECRET env var; falls back to literal for local dev. */
 const SECRET = process.env.OPENCLAW_SECRET ?? process.env.SOVEREIGN_SECRET_KEY ?? "SOVEREIGN_SECRET_KEY";
 
 function authorized(req: NextRequest): boolean {
     const header = req.headers.get("authorization") ?? "";
     return header === `Bearer ${SECRET}`;
+}
+
+// ── Redis helpers ─────────────────────────────────────────────────────────────
+
+const REDIS_KEY = "shadow_army_state";
+
+function redisAvailable(): boolean {
+    return Boolean(process.env.REDIS_URL);
+}
+
+/**
+ * Run `fn` with a connected Redis client and always disconnect afterward,
+ * even if `fn` throws. Safe for serverless — no connection leaks.
+ */
+async function withRedis<T>(fn: (client: ReturnType<typeof createClient>) => Promise<T>): Promise<T> {
+    const client = createClient({ url: process.env.REDIS_URL });
+    await client.connect();
+    try {
+        return await fn(client);
+    } finally {
+        await client.disconnect();
+    }
+}
+
+async function redisSet(payload: AgentPayload): Promise<void> {
+    await withRedis(client =>
+        client.hSet(REDIS_KEY, payload.agentId, JSON.stringify(payload)),
+    );
+}
+
+async function redisGetAll(): Promise<AgentStateMap> {
+    return withRedis(async client => {
+        // hGetAll returns Record<string, string> — values are JSON strings
+        const raw = await client.hGetAll(REDIS_KEY);
+        const result: AgentStateMap = {};
+        for (const [agentId, json] of Object.entries(raw)) {
+            try {
+                result[agentId] = JSON.parse(json) as AgentPayload;
+            } catch {
+                // Skip corrupt entries
+            }
+        }
+        return result;
+    });
 }
 
 // ── POST — receive agent ping ─────────────────────────────────────────────────
@@ -60,7 +111,7 @@ export async function POST(req: NextRequest) {
     ) {
         return NextResponse.json(
             {
-                error:   "Invalid payload",
+                error:  "Invalid payload",
                 schema: {
                     agentId:     "string (non-empty)",
                     status:      "IDLE | EXECUTING | FAILED | COMPLETED",
@@ -72,14 +123,21 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    const saved = upsertAgent({
+    const payload: AgentPayload = {
         agentId:     agentId.trim(),
         status:      status as AgentPayload["status"],
         progress:    Math.round(progress),
         currentTask: currentTask.trim(),
-    });
+        updatedAt:   new Date().toISOString(),
+    };
 
-    return NextResponse.json({ ok: true, agent: saved }, { status: 200 });
+    if (redisAvailable()) {
+        await redisSet(payload);
+    } else {
+        upsertAgent(payload);
+    }
+
+    return NextResponse.json({ ok: true, agent: payload }, { status: 200 });
 }
 
 // ── GET — return current snapshot ────────────────────────────────────────────
@@ -92,9 +150,10 @@ export async function GET(req: NextRequest) {
         );
     }
 
-    return NextResponse.json(getState(), {
+    const state = redisAvailable() ? await redisGetAll() : getState();
+
+    return NextResponse.json(state, {
         headers: {
-            // Prevent CDN caching — always fresh
             "Cache-Control": "no-store, no-cache, must-revalidate",
         },
     });
