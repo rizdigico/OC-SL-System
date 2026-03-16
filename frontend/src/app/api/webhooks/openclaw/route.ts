@@ -1,3 +1,6 @@
+// Force Next.js to never cache this route — live state must always be fresh
+export const dynamic = "force-dynamic";
+
 /**
  * POST /api/webhooks/openclaw
  *   Receive a status ping from a running OpenClaw agent.

@@ -26,7 +26,7 @@ interface DummyAgent {
 const DUMMY_AGENTS: DummyAgent[] = [
     { id: "beru",  name: "BERU",  rank: "Commander", status: "Executing", task: "Data Scraping Sprint", sr: 94, tasks: 847 },
     { id: "igris", name: "IGRIS", rank: "Knight",    status: "Idle",      task: "",                    sr: 88, tasks: 312 },
-    { id: "iron",  name: "IRON",  rank: "General",   status: "Failed",    task: "Email Outreach",      sr: 72, tasks: 156 },
+    { id: "bellion", name: "BELLION", rank: "Grand Marshal", status: "Failed", task: "Email Outreach", sr: 72, tasks: 156 },
 ];
 
 // ── Colour maps ───────────────────────────────────────────────────────────────
@@ -40,11 +40,12 @@ const STATUS_CFG: Record<string, { color: string; pulse: boolean; label: string 
 };
 
 const AGENT_RANK_COLOR: Record<string, string> = {
-    Scout:     "#64748b",
-    Knight:    "#3b82f6",
-    Commander: "#a855f7",
-    General:   "#f97316",
-    Marshal:   "#eab308",
+    Scout:          "#64748b",
+    Knight:         "#3b82f6",
+    Commander:      "#a855f7",
+    General:        "#f97316",
+    Marshal:        "#eab308",
+    "Grand Marshal": "#f43f5e",
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────

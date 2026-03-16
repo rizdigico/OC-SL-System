@@ -51,7 +51,7 @@ const BUSINESS = {
     tasks: [
         { agent: "BERU",   task: "Scraping competitor pricing — page 3/12",  status: "running" as TaskStatus },
         { agent: "IGRIS",  task: "Drafting proposal: Apex Capital Q3 deal",  status: "running" as TaskStatus },
-        { agent: "IRON",   task: "Follow-up email sequence: 7 leads queued", status: "queued"  as TaskStatus },
+        { agent: "BELLION", task: "Follow-up email sequence: 7 leads queued", status: "queued" as TaskStatus },
         { agent: "BERU",   task: "LinkedIn outreach: SaaS founders batch",   status: "done"    as TaskStatus },
         { agent: "SYSTEM", task: "CRM sync: 23 contacts updated",            status: "done"    as TaskStatus },
     ],

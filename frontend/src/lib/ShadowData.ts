@@ -109,7 +109,7 @@ export const SHADOW_INDEX: ShadowEntry[] = [
 ];
 
 /** Default set of owned shadow IDs for dummy/dev state */
-export const DEFAULT_OWNED_SHADOW_IDS: string[] = ["igris", "iron"];
+export const DEFAULT_OWNED_SHADOW_IDS: string[] = ["igris", "bellion"];
 
 export interface OwnedShadow {
     id:     string;
@@ -120,6 +120,6 @@ export interface OwnedShadow {
 
 /** Default owned shadow progression data */
 export const DEFAULT_OWNED_SHADOWS: OwnedShadow[] = [
-    { id: "igris", level: 24, exp: 3200, expMax: 5000 },
-    { id: "iron",  level: 11, exp:  800, expMax: 2000 },
+    { id: "igris",   level: 24, exp: 3200, expMax: 5000 },
+    { id: "bellion", level: 11, exp:  800, expMax: 2000 },
 ];
