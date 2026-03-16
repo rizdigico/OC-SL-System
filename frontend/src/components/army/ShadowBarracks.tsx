@@ -258,7 +258,7 @@ interface ShadowBarracksProps {
 
 export function ShadowBarracks({ isOpen, onClose, ownedShadows }: ShadowBarracksProps) {
     const [tab,       setTab]       = useState<"collection" | "roster">("collection");
-    const [equipped,  setEquipped]  = useState<Set<string>>(new Set(["igris"]));
+    const [equipped,  setEquipped]  = useState<Set<string>>(new Set(["igris", "beru", "bellion"]));
 
     const ownedIds = new Set(ownedShadows.map(s => s.id));
 

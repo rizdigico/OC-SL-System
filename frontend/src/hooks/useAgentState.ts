@@ -1,12 +1,13 @@
 "use client";
 
 /**
- * useAgentState — polls GET /api/webhooks/openclaw every 5 s.
+ * useAgentState — polls GET /api/webhooks/openclaw every 2 s.
  *
  * Returns:
  *  agents       — full AgentStateMap keyed by agentId
- *  maxProgress  — highest progress among EXECUTING agents (null if none)
- *  hasLiveData  — true when ≥1 agent is currently EXECUTING
+ *  maxProgress  — best available progress number (see logic below); null only
+ *                 before the first successful poll with any data
+ *  hasLiveData  — true once ≥1 agent has ever reported (even IDLE/COMPLETED)
  *  loading      — true on first fetch
  *  lastPoll     — Date of last successful poll
  *  error        — last error string, or null
@@ -36,8 +37,9 @@ export function useAgentState() {
                 cache:   "no-store",
             });
             if (res.ok) {
-                const data = (await res.json()) as AgentStateMap;
-                setAgents(data);
+                const raw = await res.json();
+                // Guard against null/non-object responses (e.g. empty Redis hash)
+                setAgents(raw && typeof raw === "object" && !Array.isArray(raw) ? raw as AgentStateMap : {});
                 setError(null);
             } else {
                 setError(`HTTP ${res.status}`);
@@ -56,11 +58,23 @@ export function useAgentState() {
         return () => clearInterval(id);
     }, [poll]);
 
-    const executingAgents = Object.values(agents).filter(a => a.status === "EXECUTING");
+    const allAgents       = Object.values(agents);
+    const executingAgents = allAgents.filter(a => a.status === "EXECUTING");
 
-    const maxProgress: number | null = executingAgents.length > 0
-        ? Math.max(...executingAgents.map(a => a.progress))
-        : null;
+    /**
+     * Progress shown to the auto-battler:
+     *   - Any agents EXECUTING  → highest progress among them
+     *   - Any agents COMPLETED  → 100 (battle already won)
+     *   - Agents exist but all IDLE/FAILED → 0 (standby)
+     *   - No agents at all      → null (fall back to dev slider)
+     */
+    const maxProgress: number | null =
+        allAgents.length === 0   ? null :
+        executingAgents.length > 0
+            ? Math.max(...executingAgents.map(a => a.progress))
+            : allAgents.some(a => a.status === "COMPLETED")
+                ? 100
+                : 0;
 
     return {
         agents,
@@ -68,7 +82,7 @@ export function useAgentState() {
         lastPoll,
         error,
         maxProgress,
-        /** True when at least one agent is actively EXECUTING */
-        hasLiveData: maxProgress !== null,
+        /** True once ≥1 agent has reported — stays true even after they go IDLE/COMPLETED */
+        hasLiveData: allAgents.length > 0,
     };
 }

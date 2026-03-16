@@ -68,8 +68,10 @@ async function redisSet(payload: AgentPayload): Promise<void> {
 
 async function redisGetAll(): Promise<AgentStateMap> {
     return withRedis(async client => {
-        // hGetAll returns Record<string, string> — values are JSON strings
+        // hGetAll returns Record<string, string> — values are JSON strings.
+        // Returns null/empty-object when the key doesn't exist yet.
         const raw = await client.hGetAll(REDIS_KEY);
+        if (!raw) return {};
         const result: AgentStateMap = {};
         for (const [agentId, json] of Object.entries(raw)) {
             try {
