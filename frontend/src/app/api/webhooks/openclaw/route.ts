@@ -51,10 +51,30 @@ function redisAvailable(): boolean {
 /**
  * Run `fn` with a connected Redis client and always disconnect afterward,
  * even if `fn` throws. Safe for serverless — no connection leaks.
+ *
+ * TLS note: Upstash (Vercel marketplace Redis) uses rediss:// (TLS required).
+ * We force tls:true for rediss:// so the handshake doesn't silently fail.
  */
 async function withRedis<T>(fn: (client: ReturnType<typeof createClient>) => Promise<T>): Promise<T> {
-    const client = createClient({ url: process.env.REDIS_URL });
-    await client.connect();
+    const url    = process.env.REDIS_URL!;
+    const isTLS  = url.startsWith("rediss://");
+    const client = createClient({
+        url,
+        socket: isTLS ? { tls: true, rejectUnauthorized: false } : undefined,
+    });
+
+    // Surface connection errors loudly — no silent fallback
+    client.on("error", err => console.error("[REDIS CLIENT ERROR]", err.message));
+
+    console.log(`[REDIS] Connecting to ${isTLS ? "rediss://" : "redis://"} (TLS: ${isTLS})`);
+    try {
+        await client.connect();
+        console.log("[REDIS] Connected OK");
+    } catch (err) {
+        console.error("[REDIS] Connection FAILED:", (err as Error).message);
+        throw err; // propagate — caller will return 500
+    }
+
     try {
         return await fn(client);
     } finally {
@@ -136,8 +156,15 @@ export async function POST(req: NextRequest) {
     };
 
     if (redisAvailable()) {
-        await redisSet(payload);
+        try {
+            await redisSet(payload);
+            console.log("[POST] Saved to Redis:", payload.agentId, payload.status, payload.progress);
+        } catch (err) {
+            console.error("[POST] Redis write FAILED — falling back to memory:", (err as Error).message);
+            upsertAgent(payload);
+        }
     } else {
+        console.log("[POST] REDIS_URL not set — using in-memory store (local dev only)");
         upsertAgent(payload);
     }
 
@@ -154,8 +181,20 @@ export async function GET(req: NextRequest) {
         );
     }
 
-    const data = redisAvailable() ? await redisGetAll() : getState();
-    console.log("[API GET] Raw Redis Data:", data);
+    let data: AgentStateMap;
+    if (redisAvailable()) {
+        try {
+            data = await redisGetAll();
+            console.log("[GET] Redis read OK. Keys:", Object.keys(data));
+        } catch (err) {
+            console.error("[GET] Redis read FAILED — returning empty state:", (err as Error).message);
+            data = {};
+        }
+    } else {
+        console.log("[GET] REDIS_URL not set — reading in-memory store (local dev only)");
+        data = getState();
+    }
+    console.log("[GET] Returning state:", JSON.stringify(data));
 
     return NextResponse.json(data, {
         headers: {

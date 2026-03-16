@@ -16,4 +16,13 @@
 
 ✓ Starting...
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
-✓ Ready in 538ms
+✓ Ready in 536ms
+[REDIS] Connecting to redis:// (TLS: false)
+[REDIS] Connected OK
+[POST] Saved to Redis: beru EXECUTING 10
+ POST /api/webhooks/openclaw 200 in 305ms (compile: 190ms, proxy.ts: 39ms, render: 76ms)
+[REDIS] Connecting to redis:// (TLS: false)
+[REDIS] Connected OK
+[GET] Redis read OK. Keys: [ 'igris', 'bellion', 'beru' ]
+[GET] Returning state: {"igris":{"agentId":"igris","status":"EXECUTING","progress":10,"currentTask":"Knight Commander Igris awaits your command.","updatedAt":"2026-03-16T14:03:52.181Z"},"bellion":{"agentId":"bellion","status":"EXECUTING","progress":10,"currentTask":"Grand Marshal Bellion stands ready.","updatedAt":"2026-03-16T14:04:23.760Z"},"beru":{"agentId":"beru","status":"EXECUTING","progress":10,"currentTask":"Beru test","updatedAt":"2026-03-16T14:16:20.407Z"}}
+ GET /api/webhooks/openclaw?t=1773670582488 200 in 38ms (compile: 3ms, proxy.ts: 4ms, render: 30ms)
