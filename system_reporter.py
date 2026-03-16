@@ -2,7 +2,7 @@ import requests
 
 # This points to your Next.js dashboard
 DASHBOARD_URL = "http://localhost:3000/api/webhooks/openclaw"
-SECRET_KEY = "SOVEREIGN_SECRET_KEY"
+SECRET_KEY = "AarizScorpio18112009"
 
 def report_to_system(agent_id: str, status: str, progress: int, current_task: str):
     """Sends live updates from the Python agent to the Next.js Dashboard."""
