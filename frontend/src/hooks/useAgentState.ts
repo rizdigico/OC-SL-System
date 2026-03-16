@@ -32,7 +32,8 @@ export function useAgentState() {
 
     const poll = useCallback(async () => {
         try {
-            const res = await fetch(ENDPOINT, {
+            // ?t= cache-buster defeats any CDN or browser cache that ignores headers
+            const res = await fetch(`${ENDPOINT}?t=${Date.now()}`, {
                 headers: { Authorization: `Bearer ${SECRET}` },
                 cache:   "no-store",
             });

@@ -1,5 +1,7 @@
-// Force Next.js to never cache this route — live state must always be fresh
-export const dynamic = "force-dynamic";
+// Obliterate all Next.js caching layers on this route
+export const dynamic     = "force-dynamic";
+export const fetchCache  = "force-no-store";
+export const revalidate  = 0;
 
 /**
  * POST /api/webhooks/openclaw
