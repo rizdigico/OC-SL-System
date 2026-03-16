@@ -18,7 +18,7 @@ import type { AgentStateMap } from "@/lib/agent-store";
 // Re-export so callers don't need a second import
 export type { AgentStateMap, AgentPayload, AgentStatus } from "@/lib/agent-store";
 
-const POLL_MS  = 5_000;
+const POLL_MS  = 2_000;
 const ENDPOINT = "/api/webhooks/openclaw";
 // NEXT_PUBLIC_ so the browser bundle can read it
 const SECRET   = process.env.NEXT_PUBLIC_OPENCLAW_SECRET ?? "SOVEREIGN_SECRET_KEY";

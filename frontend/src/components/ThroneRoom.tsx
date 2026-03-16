@@ -179,6 +179,23 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
 
     const { agents, hasLiveData, maxProgress } = useAgentState();
 
+    // Merge live webhook data over DUMMY_AGENTS (preserves sr/tasks/rank; overrides status/task)
+    const STATUS_MAP: Record<string, DummyAgent["status"]> = {
+        EXECUTING: "Executing",
+        IDLE:      "Idle",
+        FAILED:    "Failed",
+        COMPLETED: "Success",
+    };
+    const mergedAgents: DummyAgent[] = DUMMY_AGENTS.map(dummy => {
+        const live = agents[dummy.id];
+        if (!live) return dummy;
+        return {
+            ...dummy,
+            status: STATUS_MAP[live.status] ?? "Idle",
+            task:   live.currentTask,
+        };
+    });
+
     // Live agents drive the battler; dev slider is fallback when nothing is executing
     const effectiveProgress = hasLiveData ? (maxProgress ?? 0) : mockTaskProgress;
 
@@ -344,12 +361,12 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
                             className="flex items-center gap-2 px-4 py-2 border-b"
                             style={{ borderColor: "rgba(168,85,247,0.15)" }}
                         >
-                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-                            <span className="text-[9px] font-black tracking-[0.3em] text-purple-500">
-                                LIVE TRACKING
+                            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasLiveData ? "bg-green-400" : "bg-purple-500"}`} />
+                            <span className={`text-[9px] font-black tracking-[0.3em] ${hasLiveData ? "text-green-400" : "text-purple-500"}`}>
+                                {hasLiveData ? "LIVE SIGNAL" : "LIVE TRACKING"}
                             </span>
                             <span className="ml-auto text-[9px] text-zinc-600">
-                                {DUMMY_AGENTS.filter(a => a.status !== "Offline").length} online
+                                {mergedAgents.filter(a => a.status !== "Offline").length} online
                             </span>
                         </div>
 
@@ -359,9 +376,9 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
                             style={{ borderColor: "rgba(168,85,247,0.12)" }}
                         >
                             {[
-                                { label: "Active",    val: DUMMY_AGENTS.filter(a => a.status === "Executing").length, color: "#3b82f6" },
-                                { label: "Idle",      val: DUMMY_AGENTS.filter(a => a.status === "Idle").length,      color: "#64748b" },
-                                { label: "Failed",    val: DUMMY_AGENTS.filter(a => a.status === "Failed").length,    color: "#ef4444" },
+                                { label: "Active",    val: mergedAgents.filter(a => a.status === "Executing").length, color: "#3b82f6" },
+                                { label: "Idle",      val: mergedAgents.filter(a => a.status === "Idle").length,      color: "#64748b" },
+                                { label: "Failed",    val: mergedAgents.filter(a => a.status === "Failed").length,    color: "#ef4444" },
                             ].map(({ label, val, color }) => (
                                 <div key={label} className="flex flex-col items-center py-1 gap-0.5">
                                     <span className="text-base font-black" style={{ color }}>{val}</span>
@@ -372,7 +389,7 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
 
                         <div className="p-4 space-y-3">
                             <AnimatePresence>
-                                {DUMMY_AGENTS.map((agent, i) => (
+                                {mergedAgents.map((agent, i) => (
                                     <motion.div
                                         key={agent.id}
                                         initial={{ opacity: 0, x: 16 }}
