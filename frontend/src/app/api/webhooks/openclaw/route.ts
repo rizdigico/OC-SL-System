@@ -173,14 +173,9 @@ export async function POST(req: NextRequest) {
 
 // ── GET — return current snapshot ────────────────────────────────────────────
 
-export async function GET(req: NextRequest) {
-    if (!authorized(req)) {
-        return NextResponse.json(
-            { error: "Unauthorized — include: Authorization: Bearer <secret>" },
-            { status: 401 },
-        );
-    }
-
+export async function GET(_req: NextRequest) {
+    // No auth required on GET — the dashboard page itself is gated by Basic Auth
+    // middleware. The Bearer check only protects the write (POST) endpoint.
     let data: AgentStateMap;
     if (redisAvailable()) {
         try {
