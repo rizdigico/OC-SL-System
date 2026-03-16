@@ -20,8 +20,8 @@ import { upsertAgent, getState, AgentPayload } from "@/lib/agent-store";
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-/** Hardcoded for now; set OPENCLAW_SECRET in .env.local to override. */
-const SECRET = process.env.OPENCLAW_SECRET ?? "SOVEREIGN_SECRET_KEY";
+/** Reads from OPENCLAW_SECRET env var; falls back to literal for local dev. */
+const SECRET = process.env.OPENCLAW_SECRET ?? process.env.SOVEREIGN_SECRET_KEY ?? "SOVEREIGN_SECRET_KEY";
 
 function authorized(req: NextRequest): boolean {
     const header = req.headers.get("authorization") ?? "";
