@@ -1,0 +1,37 @@
+[    6748ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/sprites/beru.gif:0
+[    6749ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/sprites/igris.gif:0
+[    6750ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/sprites/jinwoo_commanding.gif:0
+[    6767ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/sprites/knight.gif:0
+[    6781ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/sprites/mob_poison_raikan.gif:0
+[    7667ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664674017:0
+[    9037ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664676021:0
+[   11037ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664678020:0
+[   13042ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664680021:0
+[   15042ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664682021:0
+[   17036ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664684021:0
+[   19035ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664686019:0
+[   21034ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664688018:0
+[   23037ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664690021:0
+[   25037ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664692021:0
+[   27036ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664694019:0
+[   29038ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664696019:0
+[   31043ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664698021:0
+[   33039ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664700019:0
+[   35035ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664702018:0
+[   37040ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664704022:0
+[   39036ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664706019:0
+[   41040ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664708022:0
+[   43037ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664710021:0
+[   45036ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664712019:0
+[   47044ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664714023:0
+[   49035ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664716019:0
+[   51039ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664718019:0
+[   53035ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664720019:0
+[   55035ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664722019:0
+[   57038ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664724019:0
+[   59040ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664726019:0
+[   61040ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664728019:0
+[   63038ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664730019:0
+[   65035ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664732019:0
+[   67034ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664734018:0
+[   69040ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/webhooks/openclaw?t=1773664736019:0

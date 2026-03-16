@@ -38,9 +38,10 @@ export function useAgentState() {
                 cache:   "no-store",
             });
             if (res.ok) {
-                const raw = await res.json();
+                const data = await res.json();
+                console.log("[UI FETCH] Polled Data:", data);
                 // Guard against null/non-object responses (e.g. empty Redis hash)
-                setAgents(raw && typeof raw === "object" && !Array.isArray(raw) ? raw as AgentStateMap : {});
+                setAgents(data && typeof data === "object" && !Array.isArray(data) ? data as AgentStateMap : {});
                 setError(null);
             } else {
                 setError(`HTTP ${res.status}`);

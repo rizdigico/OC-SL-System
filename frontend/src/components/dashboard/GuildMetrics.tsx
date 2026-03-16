@@ -680,6 +680,8 @@ export function GuildMetrics({ isPenaltyZone = false, liveAgents = {} }: GuildMe
     const ac = GUILDS.find(g => g.id === activeGuild)!.color;
     const hasLiveData = Object.values(liveAgents).some(a => a.status === "EXECUTING");
 
+    console.log("[UI RENDER] Current liveAgents State:", liveAgents);
+
     return (
         <div className="flex flex-col gap-4">
 

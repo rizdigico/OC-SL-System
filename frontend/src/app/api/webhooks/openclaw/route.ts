@@ -154,9 +154,10 @@ export async function GET(req: NextRequest) {
         );
     }
 
-    const state = redisAvailable() ? await redisGetAll() : getState();
+    const data = redisAvailable() ? await redisGetAll() : getState();
+    console.log("[API GET] Raw Redis Data:", data);
 
-    return NextResponse.json(state, {
+    return NextResponse.json(data, {
         headers: {
             "Cache-Control": "no-store, no-cache, must-revalidate",
         },

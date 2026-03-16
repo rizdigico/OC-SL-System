@@ -221,6 +221,7 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
         return () => clearTimeout(timeout);
     }, [initialized]);
 
+    console.log("[UI RENDER] Current liveAgents State:", agents);
     return (
         <div className="relative w-full min-h-[calc(100vh-120px)]">
 
