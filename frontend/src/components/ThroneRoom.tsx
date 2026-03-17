@@ -188,20 +188,27 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
 
     const { agents, hasLiveData, maxProgress } = useAgentState();
 
-    // Merge live webhook data over DUMMY_AGENTS (preserves sr/tasks/rank; overrides status/task/progress)
     const STATUS_MAP: Record<string, DummyAgent["status"]> = {
         EXECUTING: "Executing",
         IDLE:      "Idle",
         FAILED:    "Failed",
         COMPLETED: "Success",
     };
-    // Build a single lowercase-keyed lookup so any agentId casing matches
+
+    // Lowercase-keyed lookup so any agentId casing in Redis matches
     const agentLookup: Record<string, typeof agents[string]> = Object.fromEntries(
         Object.entries(agents).map(([k, v]) => [k.toLowerCase(), v]),
     );
+
+    // IDs already claimed by a dummy slot (after matching)
+    const claimedIds = new Set<string>();
+
+    // Merge live data over dummy slots; any matched id is marked claimed
     const mergedAgents: DummyAgent[] = DUMMY_AGENTS.map(dummy => {
-        const live = agentLookup[dummy.id.toLowerCase()];
+        const key  = dummy.id.toLowerCase();
+        const live = agentLookup[key];
         if (!live) return dummy;
+        claimedIds.add(key);
         return {
             ...dummy,
             status:   STATUS_MAP[live.status] ?? "Idle",
@@ -209,6 +216,30 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
             progress: live.progress,
         };
     });
+
+    // Any live agent whose agentId has NO matching dummy slot is surfaced as
+    // a new card so it never gets silently dropped regardless of naming.
+    const orphanAgents: DummyAgent[] = Object.entries(agentLookup)
+        .filter(([key]) => !claimedIds.has(key))
+        .map(([, live]) => ({
+            id:       live.agentId,
+            name:     live.agentId.toUpperCase(),
+            rank:     "Scout",
+            status:   STATUS_MAP[live.status] ?? "Idle",
+            task:     live.currentTask,
+            sr:       0,
+            tasks:    0,
+            progress: live.progress,
+        }));
+
+    const allAgents = [...mergedAgents, ...orphanAgents];
+
+    console.log(
+        "[ThroneRoom] agentLookup keys:", Object.keys(agentLookup),
+        "| dummy ids:", DUMMY_AGENTS.map(d => d.id),
+        "| claimed:", [...claimedIds],
+        "| orphans:", orphanAgents.map(a => a.id),
+    );
 
     // Live agents drive the battler; dev slider is fallback when nothing is executing
     const effectiveProgress = hasLiveData ? (maxProgress ?? 0) : mockTaskProgress;
@@ -381,7 +412,7 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
                                 {hasLiveData ? "LIVE SIGNAL" : "LIVE TRACKING"}
                             </span>
                             <span className="ml-auto text-[9px] text-zinc-600">
-                                {mergedAgents.filter(a => a.status !== "Offline").length} online
+                                {allAgents.filter(a => a.status !== "Offline").length} online
                             </span>
                         </div>
 
@@ -391,9 +422,9 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
                             style={{ borderColor: "rgba(168,85,247,0.12)" }}
                         >
                             {[
-                                { label: "Active",    val: mergedAgents.filter(a => a.status === "Executing").length, color: "#3b82f6" },
-                                { label: "Idle",      val: mergedAgents.filter(a => a.status === "Idle").length,      color: "#64748b" },
-                                { label: "Failed",    val: mergedAgents.filter(a => a.status === "Failed").length,    color: "#ef4444" },
+                                { label: "Active",    val: allAgents.filter(a => a.status === "Executing").length, color: "#3b82f6" },
+                                { label: "Idle",      val: allAgents.filter(a => a.status === "Idle").length,      color: "#64748b" },
+                                { label: "Failed",    val: allAgents.filter(a => a.status === "Failed").length,    color: "#ef4444" },
                             ].map(({ label, val, color }) => (
                                 <div key={label} className="flex flex-col items-center py-1 gap-0.5">
                                     <span className="text-base font-black" style={{ color }}>{val}</span>
@@ -404,7 +435,7 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
 
                         <div className="p-4 space-y-3">
                             <AnimatePresence>
-                                {mergedAgents.map((agent, i) => (
+                                {allAgents.map((agent, i) => (
                                     <motion.div
                                         key={agent.id}
                                         initial={{ opacity: 0, x: 16 }}
