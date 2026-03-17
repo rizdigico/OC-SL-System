@@ -188,16 +188,19 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
 
     const { agents, hasLiveData, maxProgress } = useAgentState();
 
-    // Merge live webhook data over DUMMY_AGENTS (preserves sr/tasks/rank; overrides status/task)
+    // Merge live webhook data over DUMMY_AGENTS (preserves sr/tasks/rank; overrides status/task/progress)
     const STATUS_MAP: Record<string, DummyAgent["status"]> = {
         EXECUTING: "Executing",
         IDLE:      "Idle",
         FAILED:    "Failed",
         COMPLETED: "Success",
     };
+    // Build a single lowercase-keyed lookup so any agentId casing matches
+    const agentLookup: Record<string, typeof agents[string]> = Object.fromEntries(
+        Object.entries(agents).map(([k, v]) => [k.toLowerCase(), v]),
+    );
     const mergedAgents: DummyAgent[] = DUMMY_AGENTS.map(dummy => {
-        // Case-insensitive lookup so "BERU" and "beru" both match
-        const live = agents[dummy.id] ?? agents[dummy.id.toLowerCase()] ?? agents[dummy.id.toUpperCase()];
+        const live = agentLookup[dummy.id.toLowerCase()];
         if (!live) return dummy;
         return {
             ...dummy,

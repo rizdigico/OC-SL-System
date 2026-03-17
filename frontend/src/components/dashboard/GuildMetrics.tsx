@@ -343,46 +343,65 @@ function BusinessView({
                         return (
                             <div
                                 key={i}
-                                className="flex items-center gap-2.5 px-3 py-2 border-b last:border-0 font-mono"
+                                className="px-3 py-2 border-b last:border-0 font-mono"
                                 style={{ borderColor: `${c}10` }}
                             >
-                                {/* Live dot */}
-                                {t.live && t.status === "running" && (
-                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
-                                )}
-                                <span
-                                    className="text-[9px] font-black tracking-wider flex-shrink-0"
-                                    style={{ color: rowColor }}
-                                >
-                                    [{t.agent}]
-                                </span>
-                                <span
-                                    className="text-[10px] flex-1 truncate"
-                                    style={{ color: t.status === "done" ? "#374151" : "#a1a1aa" }}
-                                >
-                                    {t.task}
-                                </span>
-                                {/* Progress for live entries */}
-                                {t.live && t.progress !== undefined && t.status === "running" && (
-                                    <span className="text-[8px] text-zinc-600 tabular-nums flex-shrink-0">
-                                        {t.progress}%
-                                    </span>
-                                )}
-                                <span className="flex-shrink-0 text-[9px] font-black tracking-wider">
-                                    {t.status === "running" ? (
-                                        <motion.span
-                                            animate={{ opacity: [1, 0.25, 1] }}
-                                            transition={{ duration: 0.9, repeat: Infinity }}
-                                            style={{ color: c }}
-                                        >▶ RUN</motion.span>
-                                    ) : t.status === "queued" ? (
-                                        <span className="text-zinc-600">QUEUE</span>
-                                    ) : t.status === "failed" ? (
-                                        <span style={{ color: "#ef4444" }}>✕ FAIL</span>
-                                    ) : (
-                                        <span className="text-green-900">✓ DONE</span>
+                                {/* Main row */}
+                                <div className="flex items-center gap-2.5">
+                                    {/* Live dot */}
+                                    {t.live && t.status === "running" && (
+                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
                                     )}
-                                </span>
+                                    <span
+                                        className="text-[9px] font-black tracking-wider flex-shrink-0"
+                                        style={{ color: rowColor }}
+                                    >
+                                        [{t.agent}]
+                                    </span>
+                                    <span
+                                        className="text-[10px] flex-1 truncate"
+                                        style={{ color: t.status === "done" ? "#374151" : "#a1a1aa" }}
+                                    >
+                                        {t.task}
+                                    </span>
+                                    {/* Progress % — visible for any live agent that has reported progress */}
+                                    {t.live && t.progress !== undefined && (
+                                        <span
+                                            className="text-[8px] tabular-nums flex-shrink-0 font-black"
+                                            style={{ color: rowColor }}
+                                        >
+                                            {t.progress}%
+                                        </span>
+                                    )}
+                                    <span className="flex-shrink-0 text-[9px] font-black tracking-wider">
+                                        {t.status === "running" ? (
+                                            <motion.span
+                                                animate={{ opacity: [1, 0.25, 1] }}
+                                                transition={{ duration: 0.9, repeat: Infinity }}
+                                                style={{ color: c }}
+                                            >▶ RUN</motion.span>
+                                        ) : t.status === "queued" ? (
+                                            <span className="text-zinc-600">QUEUE</span>
+                                        ) : t.status === "failed" ? (
+                                            <span style={{ color: "#ef4444" }}>✕ FAIL</span>
+                                        ) : (
+                                            <span className="text-green-900">✓ DONE</span>
+                                        )}
+                                    </span>
+                                </div>
+                                {/* CSS progress bar — only for live agents with progress data */}
+                                {t.live && t.progress !== undefined && (
+                                    <div className="mt-1.5 h-[3px] bg-zinc-900 rounded-full overflow-hidden ml-4">
+                                        <motion.div
+                                            animate={{ width: `${t.progress}%` }}
+                                            transition={{ duration: 0.4, ease: "easeOut" }}
+                                            className="h-full rounded-full"
+                                            style={{
+                                                background: `linear-gradient(90deg, ${rowColor}50, ${rowColor})`,
+                                            }}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
