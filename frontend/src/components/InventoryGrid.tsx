@@ -14,7 +14,7 @@ interface InventoryGridProps {
 export function InventoryGrid({ isOpen, onClose }: InventoryGridProps) {
     const [activeIndex, setActiveIndex] = useState<number | null>(null);
     const { playClick, playError } = useSystemAudio();
-    const { sovereign, refreshSovereign } = useSovereign();
+    const { sovereign, updateSovereign } = useSovereign();
 
     useEffect(() => {
         if (!isOpen) setActiveIndex(null);
@@ -37,7 +37,7 @@ export function InventoryGrid({ isOpen, onClose }: InventoryGridProps) {
             if (res.ok) {
                 playClick();
                 setActiveIndex(null);
-                await refreshSovereign();
+                updateSovereign(await res.json()); // apply POST response directly — no second GET
             } else {
                 playError();
             }

@@ -17,7 +17,7 @@ export function ShopInterface({ isOpen, onClose, user, setUser }: ShopInterfaceP
     const [purchaseSuccess, setPurchaseSuccess] = useState<string | null>(null);
     const [isFlashing, setIsFlashing] = useState(false);
     const { playClick, playError } = useSystemAudio();
-    const { sovereign, refreshSovereign } = useSovereign();
+    const { sovereign, updateSovereign } = useSovereign();
 
     useEffect(() => {
         if (!isOpen) return;
@@ -68,7 +68,7 @@ export function ShopInterface({ isOpen, onClose, user, setUser }: ShopInterfaceP
             });
 
             if (res.ok) {
-                await refreshSovereign();
+                updateSovereign(await res.json()); // apply POST response directly — no second GET
                 setPurchaseSuccess(`Item Acquired: ${item.name}`);
                 setTimeout(() => setPurchaseSuccess(null), 3000);
             } else {

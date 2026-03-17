@@ -28,26 +28,43 @@ const statsConfig = [
 
 export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowProps) {
     const { playClick, playError } = useSystemAudio();
-    const { sovereign, refreshSovereign } = useSovereign();
+    const { sovereign, updateSovereign } = useSovereign();
 
     if (!user) return null;
 
     const mpMax         = 50 + (user.stats?.intelligence ?? 1) * 10;
     const isTranscended = user.isTranscended;
 
-    // ── Equipment bonus calculator ──────────────────────────────────────────
-    // Base stats live in sovereign Redis. Totals = base + sum of equipped gear effects.
-    // This is computed in the frontend so equip/unequip never corrupts base stats.
+    // ── Derived stat calculator ─────────────────────────────────────────────
+    // Base stats are stored in Redis. Equipment bonuses are computed here in the
+    // frontend — equip/unequip only flip the `equipped` flag, never mutate base stats.
+    const calculateTotalStats = (base: typeof sovereign) => {
+        if (!base) return null;
+        const stats = { ...base, str: base.str, agi: base.agi, vit: base.vit, int: base.int, per: base.per };
+        (base.inventory ?? [])
+            .filter(item => item.equipped && item.type === "gear")
+            .forEach(item => {
+                stats.str += item.effect.str ?? 0;
+                stats.agi += item.effect.agi ?? 0;
+                stats.vit += item.effect.vit ?? 0;
+                stats.int += item.effect.int ?? 0;
+                stats.per += item.effect.per ?? 0;
+            });
+        const flatHpBonus = (base.inventory ?? [])
+            .filter(item => item.equipped && item.type === "gear")
+            .reduce((sum, item) => sum + (item.effect.hp ?? 0), 0);
+        stats.maxHp = 500 + (stats.vit * 10) + flatHpBonus;
+        return stats;
+    };
+    const currentStats = calculateTotalStats(sovereign);
+
     const getEquipBonus = (stat: string): number =>
         (sovereign?.inventory ?? [])
             .filter(item => item.equipped && item.type === "gear")
             .reduce((total, item) => total + (item.effect[stat] ?? 0), 0);
 
-    const totalStat   = (key: string) => (sovereign ? (sovereign as any)[key] + getEquipBonus(key) : "—");
-    const equipVit    = getEquipBonus("vit");
-    const equipHp     = getEquipBonus("hp");
-    const totalMaxHp  = (sovereign?.maxHp ?? 0) + equipVit * 10 + equipHp;
-    const currentHp   = Math.min(sovereign?.hp ?? 0, totalMaxHp);
+    const totalMaxHp = currentStats?.maxHp ?? 0;
+    const currentHp  = Math.min(sovereign?.hp ?? 0, totalMaxHp);
 
     const handleAllocate = async (statKey: string) => {
         if (!sovereign || sovereign.availablePoints <= 0) { playError(); return; }
@@ -58,7 +75,7 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
                 body:    JSON.stringify({ action: "allocate", stat: statKey }),
             });
             if (res.ok) {
-                await refreshSovereign();
+                updateSovereign(await res.json()); // apply POST response directly
             } else {
                 playError();
             }
@@ -176,7 +193,7 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
                     {/* ── Stat rows ────────────────────────────────────── */}
                     <div className="flex-1 overflow-y-auto">
                         {statsConfig.map(({ key, label, icon }) => {
-                            const val      = totalStat(key);
+                            const val      = currentStats ? (currentStats as any)[key] : "—";
                             const bonus    = getEquipBonus(key);
                             const canSpend = (sovereign?.availablePoints ?? 0) > 0;
                             return (
@@ -248,7 +265,7 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
                                         headers: { "Content-Type": "application/json" },
                                         body:    JSON.stringify({ action: "addExp", amount: 3000 }),
                                     });
-                                    if (res.ok) await refreshSovereign();
+                                    if (res.ok) updateSovereign(await res.json());
                                     else playError();
                                 } catch { playError(); }
                             }}

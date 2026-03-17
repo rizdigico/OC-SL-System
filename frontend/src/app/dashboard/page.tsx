@@ -329,8 +329,9 @@ function DashboardContent() {
     const totalVit   = (sovereign?.vit   ?? user.stats.vitality)     + getEquipBonus("vit");
     const totalInt   = (sovereign?.int   ?? user.stats.intelligence) + getEquipBonus("int");
     const totalPer   = (sovereign?.per   ?? user.stats.sense)        + getEquipBonus("per");
-    const hpMax      = (sovereign?.maxHp ?? (100 + (user.stats.vitality ?? 1) * 20))
-                       + getEquipBonus("vit") * 10 + getEquipBonus("hp");
+    const flatHpBonus = getEquipBonus("hp");
+    const hpMax      = sovereign ? 500 + (totalVit * 10) + flatHpBonus
+                                 : 100 + (user.stats.vitality ?? 1) * 20;
     const currentHp  = Math.min(sovereign?.hp ?? hpMax, hpMax);
 
     return (
