@@ -30,6 +30,7 @@ export const revalidate  = 0;
 import { NextRequest, NextResponse } from "next/server";
 import { createClient }              from "redis";
 import { upsertAgent, getState, AgentPayload, AgentStateMap } from "@/lib/agent-store";
+import type { SovereignState } from "@/app/api/sovereign/route";
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -106,6 +107,50 @@ async function redisGetAll(): Promise<AgentStateMap> {
     });
 }
 
+// ── Sovereign EXP bridge ──────────────────────────────────────────────────────
+
+const SOVEREIGN_KEY = "sovereign_state";
+
+const SOVEREIGN_DEFAULTS: SovereignState = {
+    level: 17, exp: 4200, maxExp: 7009, title: "Wolf Slayer",
+    hp: 900, maxHp: 900, fatigue: 12,
+    str: 40, agi: 35, vit: 40, int: 60, per: 30, availablePoints: 5,
+};
+
+async function sovereignGet(): Promise<SovereignState> {
+    return withRedis(async client => {
+        const raw = await client.get(SOVEREIGN_KEY);
+        if (!raw) return { ...SOVEREIGN_DEFAULTS };
+        try { return JSON.parse(raw) as SovereignState; }
+        catch { return { ...SOVEREIGN_DEFAULTS }; }
+    });
+}
+
+async function sovereignSet(state: SovereignState): Promise<void> {
+    await withRedis(client => client.set(SOVEREIGN_KEY, JSON.stringify(state)));
+}
+
+function applyExpGain(state: SovereignState, amount: number): SovereignState {
+    let { level, exp, maxExp, title, availablePoints } = { ...state, exp: state.exp + amount };
+    while (exp >= maxExp) {
+        exp            -= maxExp;
+        level          += 1;
+        availablePoints += 5;
+        maxExp          = Math.round(maxExp * 1.2);
+    }
+    if (level >= 40) title = "Shadow Monarch";
+    else if (level >= 30) title = "Elite Knight";
+    else if (level >= 20) title = "Shadow Infantry";
+    return { ...state, level, exp, maxExp, title, availablePoints };
+}
+
+async function injectSovereignExp(expReward: number): Promise<void> {
+    const current = await sovereignGet();
+    const updated = applyExpGain(current, expReward);
+    await sovereignSet(updated);
+    console.log(`[SOVEREIGN] +${expReward} EXP injected. Level: ${current.level} → ${updated.level}`);
+}
+
 // ── POST — receive agent ping ─────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -162,6 +207,19 @@ export async function POST(req: NextRequest) {
         } catch (err) {
             console.error("[POST] Redis write FAILED — falling back to memory:", (err as Error).message);
             upsertAgent(payload);
+        }
+
+        // ── EXP injection on COMPLETED ────────────────────────────────────────
+        if (payload.status === "COMPLETED") {
+            const expReward = typeof body.expReward === "number" && body.expReward > 0
+                ? Math.round(body.expReward)
+                : 50;
+            try {
+                await injectSovereignExp(expReward);
+            } catch (err) {
+                // Non-fatal — agent tracking already succeeded
+                console.error("[POST] Sovereign EXP injection FAILED:", (err as Error).message);
+            }
         }
     } else {
         console.log("[POST] REDIS_URL not set — using in-memory store (local dev only)");
