@@ -174,28 +174,6 @@ function allocateStat(state: SovereignState, stat: StatKey): SovereignState {
     return next;
 }
 
-/** Apply or remove gear stat bonuses. `sign` is +1 to equip, -1 to unequip. */
-function applyGearEffect(state: SovereignState, effect: Record<string, number>, sign: 1 | -1): SovereignState {
-    let next = { ...state };
-    for (const [key, bonus] of Object.entries(effect)) {
-        const delta = sign * bonus;
-        if ((VALID_STATS as readonly string[]).includes(key)) {
-            (next as any)[key] = Math.max(0, (next as any)[key] + delta);
-            if (key === "vit") {
-                next.maxHp = Math.max(1,   next.maxHp + delta * 10);
-                next.hp    = sign === 1
-                    ? Math.min(next.hp + delta * 10, next.maxHp)
-                    : Math.min(next.hp, next.maxHp);
-            }
-        } else if (key === "hp") {
-            next.maxHp = Math.max(1, next.maxHp + delta);
-            next.hp    = sign === 1
-                ? Math.min(next.hp + delta, next.maxHp)
-                : Math.min(next.hp, next.maxHp);
-        }
-    }
-    return next;
-}
 
 // ── GET — fetch current sovereign state ────────────────────────────────────────
 
@@ -295,14 +273,16 @@ export async function POST(req: NextRequest) {
         state = { ...state, gold: state.gold - cost, inventory: newInventory };
 
     // ── equipItem ────────────────────────────────────────────────────────────
+    // NOTE: base stats (str/agi/vit/int/per/maxHp) are NEVER modified by equip.
+    // Totals = base + equipment bonuses are computed in the frontend so there is
+    // no risk of data drift from repeated equip/unequip cycles.
     } else if (action === "equipItem") {
         const { itemId } = body as { itemId?: string };
         const idx = state.inventory.findIndex(i => i.id === itemId);
         if (idx < 0) return NextResponse.json({ error: "Item not in inventory" }, { status: 422 });
         const item = state.inventory[idx];
-        if (item.type !== "gear")    return NextResponse.json({ error: "Only gear can be equipped" }, { status: 422 });
-        if (item.equipped)           return NextResponse.json({ error: "Already equipped" }, { status: 422 });
-        state = applyGearEffect(state, item.effect, +1 as 1);
+        if (item.type !== "gear") return NextResponse.json({ error: "Only gear can be equipped" }, { status: 422 });
+        if (item.equipped)        return NextResponse.json({ error: "Already equipped" }, { status: 422 });
         state = {
             ...state,
             inventory: state.inventory.map((i, n) => n === idx ? { ...i, equipped: true } : i),
@@ -315,7 +295,6 @@ export async function POST(req: NextRequest) {
         if (idx < 0) return NextResponse.json({ error: "Item not in inventory" }, { status: 422 });
         const item = state.inventory[idx];
         if (!item.equipped) return NextResponse.json({ error: "Item not equipped" }, { status: 422 });
-        state = applyGearEffect(state, item.effect, -1 as -1);
         state = {
             ...state,
             inventory: state.inventory.map((i, n) => n === idx ? { ...i, equipped: false } : i),

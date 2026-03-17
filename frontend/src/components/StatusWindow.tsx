@@ -35,6 +35,20 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
     const mpMax         = 50 + (user.stats?.intelligence ?? 1) * 10;
     const isTranscended = user.isTranscended;
 
+    // ── Equipment bonus calculator ──────────────────────────────────────────
+    // Base stats live in sovereign Redis. Totals = base + sum of equipped gear effects.
+    // This is computed in the frontend so equip/unequip never corrupts base stats.
+    const getEquipBonus = (stat: string): number =>
+        (sovereign?.inventory ?? [])
+            .filter(item => item.equipped && item.type === "gear")
+            .reduce((total, item) => total + (item.effect[stat] ?? 0), 0);
+
+    const totalStat   = (key: string) => (sovereign ? (sovereign as any)[key] + getEquipBonus(key) : "—");
+    const equipVit    = getEquipBonus("vit");
+    const equipHp     = getEquipBonus("hp");
+    const totalMaxHp  = (sovereign?.maxHp ?? 0) + equipVit * 10 + equipHp;
+    const currentHp   = Math.min(sovereign?.hp ?? 0, totalMaxHp);
+
     const handleAllocate = async (statKey: string) => {
         if (!sovereign || sovereign.availablePoints <= 0) { playError(); return; }
         try {
@@ -132,12 +146,12 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
                             <div className="sl-bar-track">
                                 <div className="sl-bar-fill-hp" style={{
                                     width: sovereign
-                                        ? `${Math.min(100, (sovereign.hp / sovereign.maxHp) * 100)}%`
+                                        ? `${Math.min(100, (currentHp / totalMaxHp) * 100)}%`
                                         : "100%"
                                 }} />
                             </div>
                             <span className="text-[10px] text-[#7a9abf] font-bold tabular-nums w-20 text-right">
-                                {sovereign?.hp ?? "—"}/{sovereign?.maxHp ?? "—"}
+                                {sovereign ? currentHp : "—"}/{sovereign ? totalMaxHp : "—"}
                             </span>
                         </div>
                         {/* MP */}
@@ -162,7 +176,8 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
                     {/* ── Stat rows ────────────────────────────────────── */}
                     <div className="flex-1 overflow-y-auto">
                         {statsConfig.map(({ key, label, icon }) => {
-                            const val     = sovereign ? (sovereign as any)[key] : "—";
+                            const val      = totalStat(key);
+                            const bonus    = getEquipBonus(key);
                             const canSpend = (sovereign?.availablePoints ?? 0) > 0;
                             return (
                                 <div key={key}
@@ -173,6 +188,9 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
                                         <span className="text-[#5588cc] group-hover:text-[#11D2EF] transition-colors">{icon}</span>
                                         <span className="text-[#7a9abf] group-hover:text-white text-xs font-semibold tracking-[0.15em] uppercase transition-colors w-8">{label}</span>
                                         <span className="text-white text-xl font-black font-caros tabular-nums">{val}</span>
+                                        {bonus > 0 && (
+                                            <span className="text-[10px] font-bold text-[#FFD700] tracking-wide">+{bonus}</span>
+                                        )}
                                     </div>
                                     <button
                                         onClick={() => { playClick(); handleAllocate(key); }}

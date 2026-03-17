@@ -18,7 +18,8 @@ export function SovereignProvider({ children }: { children: React.ReactNode }) {
 
     const refreshSovereign = useCallback(async () => {
         try {
-            const res = await fetch("/api/sovereign", { cache: "no-store" });
+            // ?t= busts Next.js's internal fetch cache so every call returns live Redis data
+            const res = await fetch(`/api/sovereign?t=${Date.now()}`, { cache: "no-store" });
             if (res.ok) setSovereign(await res.json());
         } catch (err) {
             console.error("[SovereignContext] Fetch failed:", err);

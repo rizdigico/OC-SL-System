@@ -316,8 +316,22 @@ function DashboardContent() {
     const expPercentage = sovereign
         ? Math.min(100, Math.max(0, (sovereign.exp / sovereign.maxExp) * 100))
         : Math.min(100, Math.max(0, ((user.stats.exp ?? 0) / nextLevelExp) * 100));
-    const hpMax = sovereign?.maxHp ?? (100 + (user.stats.vitality ?? 1) * 20);
     const mpMax = 50 + (user.stats.intelligence ?? 1) * 10;
+
+    // ── Equipment bonus calculator ─────────────────────────────────────────
+    const getEquipBonus = (stat: string): number =>
+        (sovereign?.inventory ?? [])
+            .filter(item => item.equipped && item.type === "gear")
+            .reduce((total, item) => total + ((item.effect as any)[stat] ?? 0), 0);
+
+    const totalStr   = (sovereign?.str   ?? user.stats.strength)     + getEquipBonus("str");
+    const totalAgi   = (sovereign?.agi   ?? user.stats.agility)      + getEquipBonus("agi");
+    const totalVit   = (sovereign?.vit   ?? user.stats.vitality)     + getEquipBonus("vit");
+    const totalInt   = (sovereign?.int   ?? user.stats.intelligence) + getEquipBonus("int");
+    const totalPer   = (sovereign?.per   ?? user.stats.sense)        + getEquipBonus("per");
+    const hpMax      = (sovereign?.maxHp ?? (100 + (user.stats.vitality ?? 1) * 20))
+                       + getEquipBonus("vit") * 10 + getEquipBonus("hp");
+    const currentHp  = Math.min(sovereign?.hp ?? hpMax, hpMax);
 
     return (
         <DashboardErrorBoundary>
@@ -508,11 +522,11 @@ function DashboardContent() {
                                     <HeartIcon className="w-4 h-4 text-[#5599ff] flex-shrink-0" />
                                     <div className="sl-bar-track">
                                         <div className="sl-bar-fill-hp" style={{
-                                            width: sovereign ? `${Math.min(100, (sovereign.hp / sovereign.maxHp) * 100)}%` : "100%"
+                                            width: sovereign ? `${Math.min(100, (currentHp / hpMax) * 100)}%` : "100%"
                                         }} />
                                     </div>
                                     <span className="text-[10px] text-[#7a9abf] font-bold w-20 text-right tabular-nums">
-                                        {sovereign?.hp ?? hpMax}/{hpMax}
+                                        {currentHp}/{hpMax}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -532,11 +546,11 @@ function DashboardContent() {
 
                             {/* Stat rows */}
                             <div className="divide-y divide-[rgba(30,68,200,0.12)]">
-                                <SLStatRow icon={<Shield className="w-3.5 h-3.5"/>} label="STR" value={sovereign?.str ?? user.stats.strength} />
-                                <SLStatRow icon={<Activity className="w-3.5 h-3.5"/>} label="AGI" value={sovereign?.agi ?? user.stats.agility} />
-                                <SLStatRow icon={<HeartIcon className="w-3.5 h-3.5"/>} label="VIT" value={sovereign?.vit ?? user.stats.vitality} />
-                                <SLStatRow icon={<Brain className="w-3.5 h-3.5"/>} label="INT" value={sovereign?.int ?? user.stats.intelligence} />
-                                <SLStatRow icon={<Eye className="w-3.5 h-3.5"/>} label="PER" value={sovereign?.per ?? user.stats.sense} />
+                                <SLStatRow icon={<Shield className="w-3.5 h-3.5"/>} label="STR" value={totalStr} />
+                                <SLStatRow icon={<Activity className="w-3.5 h-3.5"/>} label="AGI" value={totalAgi} />
+                                <SLStatRow icon={<HeartIcon className="w-3.5 h-3.5"/>} label="VIT" value={totalVit} />
+                                <SLStatRow icon={<Brain className="w-3.5 h-3.5"/>} label="INT" value={totalInt} />
+                                <SLStatRow icon={<Eye className="w-3.5 h-3.5"/>} label="PER" value={totalPer} />
                             </div>
 
                             {/* Available points + actions */}
