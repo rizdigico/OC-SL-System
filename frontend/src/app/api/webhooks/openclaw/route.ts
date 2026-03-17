@@ -193,7 +193,7 @@ export async function POST(req: NextRequest) {
     }
 
     const payload: AgentPayload = {
-        agentId:     agentId.trim(),
+        agentId:     agentId.trim().toLowerCase(),   // normalise so Redis keys are always lowercase
         status:      status as AgentPayload["status"],
         progress:    Math.round(progress),
         currentTask: currentTask.trim(),

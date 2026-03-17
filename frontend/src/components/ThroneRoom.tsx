@@ -195,36 +195,30 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
         COMPLETED: "Success",
     };
 
-    // Lowercase-keyed lookup so any agentId casing in Redis matches
-    const agentLookup: Record<string, typeof agents[string]> = Object.fromEntries(
-        Object.entries(agents).map(([k, v]) => [k.toLowerCase(), v]),
-    );
-
-    // IDs already claimed by a dummy slot (after matching)
+    // All keys in `agents` are guaranteed lowercase (normalised at webhook write-time).
+    // Dummy IDs are already lowercase. Direct lookup: agents[dummy.id.toLowerCase()].
     const claimedIds = new Set<string>();
 
-    // Merge live data over dummy slots; any matched id is marked claimed
     const mergedAgents: DummyAgent[] = DUMMY_AGENTS.map(dummy => {
-        const key  = dummy.id.toLowerCase();
-        const live = agentLookup[key];
-        if (!live) return dummy;
-        claimedIds.add(key);
+        const normalizedId = dummy.id.toLowerCase();
+        const liveData     = agents[normalizedId];   // always matches — keys are lowercase at source
+        if (!liveData) return dummy;
+        claimedIds.add(normalizedId);
         return {
             ...dummy,
-            status:   STATUS_MAP[live.status] ?? "Idle",
-            task:     live.currentTask,
-            progress: live.progress,
+            status:   STATUS_MAP[liveData.status] ?? "Idle",
+            task:     liveData.currentTask,
+            progress: liveData.progress,
         };
     });
 
-    // Any live agent whose agentId has NO matching dummy slot is surfaced as
-    // a new card so it never gets silently dropped regardless of naming.
-    const orphanAgents: DummyAgent[] = Object.entries(agentLookup)
-        .filter(([key]) => !claimedIds.has(key))
-        .map(([, live]) => ({
+    // Surface any live agent not matched by a dummy so nothing is ever silently dropped
+    const orphanAgents: DummyAgent[] = Object.values(agents)
+        .filter(live => !claimedIds.has(live.agentId.toLowerCase()))
+        .map(live => ({
             id:       live.agentId,
             name:     live.agentId.toUpperCase(),
-            rank:     "Scout",
+            rank:     "Scout" as const,
             status:   STATUS_MAP[live.status] ?? "Idle",
             task:     live.currentTask,
             sr:       0,
@@ -233,13 +227,6 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
         }));
 
     const allAgents = [...mergedAgents, ...orphanAgents];
-
-    console.log(
-        "[ThroneRoom] agentLookup keys:", Object.keys(agentLookup),
-        "| dummy ids:", DUMMY_AGENTS.map(d => d.id),
-        "| claimed:", [...claimedIds],
-        "| orphans:", orphanAgents.map(a => a.id),
-    );
 
     // Live agents drive the battler; dev slider is fallback when nothing is executing
     const effectiveProgress = hasLiveData ? (maxProgress ?? 0) : mockTaskProgress;
