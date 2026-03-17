@@ -230,6 +230,35 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
                             </span>
                         </div>
                     </div>
+
+                    {/* ── [TEMP] Admin Potion ───────────────────────────── */}
+                    <div className="px-5 py-3 flex-shrink-0"
+                        style={{borderTop: '1px solid rgba(120,40,200,0.3)', background: 'rgba(20,0,40,0.8)'}}
+                    >
+                        <button
+                            onClick={async () => {
+                                playClick();
+                                try {
+                                    const res = await fetch("/api/sovereign", {
+                                        method:  "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body:    JSON.stringify({ action: "addExp", amount: 3000 }),
+                                    });
+                                    if (res.ok) setSovereign(await res.json());
+                                    else playError();
+                                } catch { playError(); }
+                            }}
+                            className="w-full py-2 text-xs font-bold tracking-[0.2em] uppercase transition-all duration-200 hover:brightness-125"
+                            style={{
+                                border:     '1px solid rgba(140,60,255,0.6)',
+                                background: 'rgba(60,0,120,0.3)',
+                                color:      '#c084fc',
+                                boxShadow:  '0 0 10px rgba(120,40,220,0.2)',
+                            }}
+                        >
+                            ⚗ Admin Potion +3000 EXP
+                        </button>
+                    </div>
                 </motion.div>
             )}
         </AnimatePresence>
