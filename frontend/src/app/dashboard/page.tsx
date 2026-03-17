@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { SovereignProvider, useSovereign } from "@/context/SovereignContext";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Brain, Eye, Activity, Shield, Sparkles, ShoppingCart, Package, Sword, Settings, Zap, Skull, Terminal, BookOpen } from "lucide-react";
@@ -116,7 +117,8 @@ function buildUserFromAssessment(r: any) {
     };
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
+    const { sovereign, refreshSovereign } = useSovereign();
     const [user, setUser] = useState<any>(() => {
         if (typeof window === "undefined") return MOCK_USER;
         try {
@@ -310,9 +312,11 @@ export default function DashboardPage() {
     };
     user.stats = stats;
 
-    const nextLevelExp = Math.floor(100 * Math.pow(user.stats.level ?? 1, 1.5));
-    const expPercentage = Math.min(100, Math.max(0, ((user.stats.exp ?? 0) / nextLevelExp) * 100));
-    const hpMax = 100 + (user.stats.vitality ?? 1) * 20;
+    const nextLevelExp  = sovereign?.maxExp ?? Math.floor(100 * Math.pow(user.stats.level ?? 1, 1.5));
+    const expPercentage = sovereign
+        ? Math.min(100, Math.max(0, (sovereign.exp / sovereign.maxExp) * 100))
+        : Math.min(100, Math.max(0, ((user.stats.exp ?? 0) / nextLevelExp) * 100));
+    const hpMax = sovereign?.maxHp ?? (100 + (user.stats.vitality ?? 1) * 20);
     const mpMax = 50 + (user.stats.intelligence ?? 1) * 10;
 
     return (
@@ -438,10 +442,10 @@ export default function DashboardPage() {
                             <div className="flex-1 w-full md:max-w-md">
                                 <div className="flex justify-between items-center mb-2">
                                     <span className={`font-bold font-caros text-xs tracking-widest ${user.isTranscended ? 'text-[#A480F2]' : 'text-[#1e44ff]'}`}>
-                                        LEVEL {user.stats.level}
+                                        LEVEL {sovereign?.level ?? user.stats.level}
                                     </span>
                                     <span className="text-[#7a9abf] font-caros text-xs">
-                                        {user.stats.exp} / {nextLevelExp} EXP
+                                        {sovereign?.exp ?? user.stats.exp} / {nextLevelExp} EXP
                                     </span>
                                 </div>
                                 <div className="sl-bar-track">
@@ -479,7 +483,7 @@ export default function DashboardPage() {
                             {/* Level / Job / Title row */}
                             <div className="flex items-center gap-4 p-4 border-b border-[rgba(30,68,200,0.2)]">
                                 <div className="text-center flex-shrink-0">
-                                    <div className="text-5xl font-black text-white font-caros leading-none">{user.stats.level}</div>
+                                    <div className="text-5xl font-black text-white font-caros leading-none">{sovereign?.level ?? user.stats.level}</div>
                                     <div className="text-[10px] text-[#7a9abf] tracking-[0.2em] uppercase mt-1">LEVEL</div>
                                 </div>
                                 <div className="flex-1 text-xs space-y-1">
@@ -489,7 +493,7 @@ export default function DashboardPage() {
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="sl-text-dim uppercase tracking-wider">TITLE</span>
-                                        <span className="text-white font-semibold">{user.title || "None"}</span>
+                                        <span className="text-white font-semibold">{sovereign?.title ?? user.title ?? "None"}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="sl-text-dim uppercase tracking-wider">RANK</span>
@@ -503,10 +507,12 @@ export default function DashboardPage() {
                                 <div className="flex items-center gap-2">
                                     <HeartIcon className="w-4 h-4 text-[#5599ff] flex-shrink-0" />
                                     <div className="sl-bar-track">
-                                        <div className="sl-bar-fill-hp" style={{width:'100%'}} />
+                                        <div className="sl-bar-fill-hp" style={{
+                                            width: sovereign ? `${Math.min(100, (sovereign.hp / sovereign.maxHp) * 100)}%` : "100%"
+                                        }} />
                                     </div>
                                     <span className="text-[10px] text-[#7a9abf] font-bold w-20 text-right tabular-nums">
-                                        {hpMax}/{hpMax}
+                                        {sovereign?.hp ?? hpMax}/{hpMax}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -520,17 +526,17 @@ export default function DashboardPage() {
                                 </div>
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="sl-text-dim uppercase tracking-wider">FATIGUE</span>
-                                    <span className="text-white font-bold">{user.stats.fatigue ?? 0}</span>
+                                    <span className="text-white font-bold">{sovereign?.fatigue ?? user.stats.fatigue ?? 0}</span>
                                 </div>
                             </div>
 
                             {/* Stat rows */}
                             <div className="divide-y divide-[rgba(30,68,200,0.12)]">
-                                <SLStatRow icon={<Shield className="w-3.5 h-3.5"/>} label="STR" value={user.stats.strength} />
-                                <SLStatRow icon={<Activity className="w-3.5 h-3.5"/>} label="AGI" value={user.stats.agility} />
-                                <SLStatRow icon={<HeartIcon className="w-3.5 h-3.5"/>} label="VIT" value={user.stats.vitality} />
-                                <SLStatRow icon={<Brain className="w-3.5 h-3.5"/>} label="INT" value={user.stats.intelligence} />
-                                <SLStatRow icon={<Eye className="w-3.5 h-3.5"/>} label="PER" value={user.stats.sense} />
+                                <SLStatRow icon={<Shield className="w-3.5 h-3.5"/>} label="STR" value={sovereign?.str ?? user.stats.strength} />
+                                <SLStatRow icon={<Activity className="w-3.5 h-3.5"/>} label="AGI" value={sovereign?.agi ?? user.stats.agility} />
+                                <SLStatRow icon={<HeartIcon className="w-3.5 h-3.5"/>} label="VIT" value={sovereign?.vit ?? user.stats.vitality} />
+                                <SLStatRow icon={<Brain className="w-3.5 h-3.5"/>} label="INT" value={sovereign?.int ?? user.stats.intelligence} />
+                                <SLStatRow icon={<Eye className="w-3.5 h-3.5"/>} label="PER" value={sovereign?.per ?? user.stats.sense} />
                             </div>
 
                             {/* Available points + actions */}
@@ -539,7 +545,7 @@ export default function DashboardPage() {
                                     <span className="sl-text-dim uppercase tracking-wider">Available Ability Points</span>
                                     <span className={`font-black text-lg ${user.isTranscended ? 'text-[#A480F2]' : 'text-[#11D2EF]'}`}
                                           style={{textShadow: user.isTranscended ? '0 0 8px rgba(164,128,242,0.7)' : '0 0 8px rgba(17,210,239,0.7)'}}>
-                                        {user.stats.statPoints}
+                                        {sovereign?.availablePoints ?? user.stats.statPoints}
                                     </span>
                                 </div>
                                 <button onClick={() => setIsStatusOpen(true)} className="sl-btn w-full flex items-center justify-center gap-2">
@@ -759,5 +765,13 @@ function NavTab({ active, onClick, icon, label, col = "", danger = false }: {
         >
             {icon}{label}
         </button>
+    );
+}
+
+export default function DashboardPage() {
+    return (
+        <SovereignProvider>
+            <DashboardContent />
+        </SovereignProvider>
     );
 }

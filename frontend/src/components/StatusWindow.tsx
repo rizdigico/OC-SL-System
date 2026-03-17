@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Zap, Brain, Eye, Activity, Shield } from "lucide-react";
 import { useSystemAudio } from "@/hooks/useSystemAudio";
-import type { SovereignState } from "@/app/api/sovereign/route";
+import { useSovereign } from "@/context/SovereignContext";
 
 interface StatusWindowProps {
     isOpen: boolean;
@@ -28,21 +28,7 @@ const statsConfig = [
 
 export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowProps) {
     const { playClick, playError } = useSystemAudio();
-    const [sovereign, setSovereign] = useState<SovereignState | null>(null);
-
-    const fetchSovereign = useCallback(async () => {
-        try {
-            const res = await fetch("/api/sovereign", { cache: "no-store" });
-            if (res.ok) setSovereign(await res.json());
-        } catch (err) {
-            console.error("[StatusWindow] Failed to fetch sovereign state:", err);
-        }
-    }, []);
-
-    // Fetch on open
-    useEffect(() => {
-        if (isOpen) fetchSovereign();
-    }, [isOpen, fetchSovereign]);
+    const { sovereign, refreshSovereign } = useSovereign();
 
     if (!user) return null;
 
@@ -58,7 +44,7 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
                 body:    JSON.stringify({ action: "allocate", stat: statKey }),
             });
             if (res.ok) {
-                setSovereign(await res.json());
+                await refreshSovereign();
             } else {
                 playError();
             }
@@ -244,7 +230,7 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
                                         headers: { "Content-Type": "application/json" },
                                         body:    JSON.stringify({ action: "addExp", amount: 3000 }),
                                     });
-                                    if (res.ok) setSovereign(await res.json());
+                                    if (res.ok) await refreshSovereign();
                                     else playError();
                                 } catch { playError(); }
                             }}
