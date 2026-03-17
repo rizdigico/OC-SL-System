@@ -12,7 +12,7 @@ export interface InventoryItem {
     name:        string;
     type:        "consumable" | "gear";
     description: string;
-    effect:      Record<string, number>;  // e.g. { str: 5, vit: 10, hp: 100 }
+    effect:      Record<string, number>;
     quantity:    number;
     equipped:    boolean;
 }
@@ -59,26 +59,20 @@ const REDIS_KEY   = "sovereign_state";
 const VALID_STATS = ["str", "agi", "vit", "int", "per"] as const;
 type  StatKey     = typeof VALID_STATS[number];
 
-// Normalize Express item effect keys (long names) → sovereign stat keys (short names)
+// ── Effect normalization ─────────────────────────────────────────────────────
+
 const STAT_KEY_MAP: Record<string, string> = {
-    strength:     "str",
-    agility:      "agi",
-    vitality:     "vit",
-    intelligence: "int",
-    sense:        "per",
-    perception:   "per",
+    strength: "str", agility: "agi", vitality: "vit",
+    intelligence: "int", sense: "per", perception: "per",
 };
 
 function normalizeGearEffect(raw: Record<string, unknown>): Record<string, number> {
     const result: Record<string, number> = {};
     for (const [k, v] of Object.entries(raw)) {
-        // Fix 2: coerce — accept both number and stringified number; discard only on NaN
-        const parsed = Number(v);
-        if (isNaN(parsed)) continue;  // skip slot, paralysis, boolean flags, etc.
+        const n = Number(v);
+        if (isNaN(n)) continue;
         const key = STAT_KEY_MAP[k] ?? k;
-        if ((VALID_STATS as readonly string[]).includes(key) || key === "hp") {
-            result[key] = parsed;
-        }
+        if ((VALID_STATS as readonly string[]).includes(key) || key === "hp") result[key] = n;
     }
     return result;
 }
@@ -86,26 +80,18 @@ function normalizeGearEffect(raw: Record<string, unknown>): Record<string, numbe
 function normalizeConsumableEffect(raw: Record<string, unknown>): Record<string, number> {
     const result: Record<string, number> = {};
     for (const [k, v] of Object.entries(raw)) {
-        // Fix 2: coerce — accept both number and stringified number; discard only on NaN
-        const parsed = Number(v);
-        if (isNaN(parsed)) continue;
-        // For consumables: vitality = HP restore, not stat increase
-        if (k === "vitality") { result["hp"] = parsed; continue; }
+        const n = Number(v);
+        if (isNaN(n)) continue;
+        if (k === "vitality") { result["hp"] = n; continue; }
         const key = STAT_KEY_MAP[k] ?? k;
-        result[key] = parsed;
+        result[key] = n;
     }
     return result;
 }
 
-// ── Redis helpers ──────────────────────────────────────────────────────────────
+// ── Redis: single-connection helper ──────────────────────────────────────────
 
-function redisAvailable(): boolean {
-    return Boolean(process.env.REDIS_URL);
-}
-
-async function withRedis<T>(
-    fn: (client: ReturnType<typeof createClient>) => Promise<T>,
-): Promise<T> {
+async function withRedis<T>(fn: (client: ReturnType<typeof createClient>) => Promise<T>): Promise<T> {
     const url   = process.env.REDIS_URL!;
     const isTLS = url.startsWith("rediss://");
     const client = createClient({
@@ -114,37 +100,27 @@ async function withRedis<T>(
     });
     client.on("error", err => console.error("[SOVEREIGN REDIS ERROR]", err.message));
     await client.connect();
+    try     { return await fn(client); }
+    finally { await client.disconnect(); }
+}
+
+/** Parse the raw JSON blob from Redis into a SovereignState with backfilled defaults. */
+function parseState(raw: string | null): SovereignState {
+    if (!raw) return { ...DEFAULT_STATE };
     try {
-        return await fn(client);
-    } finally {
-        await client.disconnect();
+        const p = JSON.parse(raw) as Partial<SovereignState>;
+        return {
+            ...DEFAULT_STATE,
+            ...p,
+            gold:      p.gold      ?? DEFAULT_STATE.gold,
+            inventory: Array.isArray(p.inventory) ? p.inventory : [],
+        };
+    } catch {
+        return { ...DEFAULT_STATE };
     }
 }
 
-async function redisGet(): Promise<SovereignState> {
-    return withRedis(async client => {
-        const raw = await client.get(REDIS_KEY);
-        if (!raw) return { ...DEFAULT_STATE };
-        try {
-            const parsed = JSON.parse(raw) as SovereignState;
-            // Backfill new fields for states persisted before inventory system
-            return {
-                ...DEFAULT_STATE,
-                ...parsed,
-                gold:      parsed.gold      ?? DEFAULT_STATE.gold,
-                inventory: parsed.inventory ?? [],
-            };
-        } catch {
-            return { ...DEFAULT_STATE };
-        }
-    });
-}
-
-async function redisSet(state: SovereignState): Promise<void> {
-    await withRedis(client => client.set(REDIS_KEY, JSON.stringify(state)));
-}
-
-// ── RPG business logic ─────────────────────────────────────────────────────────
+// ── RPG business logic ──────────────────────────────────────────────────────
 
 function resolveTitle(level: number, currentTitle: string): string {
     if (level >= 40) return "Shadow Monarch";
@@ -166,40 +142,40 @@ function processLevelUp(state: SovereignState): SovereignState {
 }
 
 function allocateStat(state: SovereignState, stat: StatKey): SovereignState {
-    let next: SovereignState = {
+    const next: SovereignState = {
         ...state,
         [stat]:          state[stat] + 1,
         availablePoints: state.availablePoints - 1,
     };
-    if (stat === "vit") {
-        next.maxHp += 10;
-        next.hp    += 10;
-    }
+    if (stat === "vit") { next.maxHp += 10; next.hp += 10; }
     return next;
 }
 
-
-// ── GET — fetch current sovereign state ────────────────────────────────────────
+// ── GET — single connection: read → respond ─────────────────────────────────
 
 export async function GET() {
-    let state: SovereignState;
-    if (redisAvailable()) {
-        try {
-            state = await redisGet();
-        } catch (err) {
-            console.error("[SOVEREIGN GET] Redis failed:", (err as Error).message);
-            state = { ...DEFAULT_STATE };
-        }
-    } else {
-        console.log("[SOVEREIGN GET] No REDIS_URL — returning defaults");
-        state = { ...DEFAULT_STATE };
+    if (!process.env.REDIS_URL) {
+        return NextResponse.json(DEFAULT_STATE, {
+            headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+        });
     }
-    return NextResponse.json(state, {
-        headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
-    });
+    try {
+        const state = await withRedis(async client => {
+            const raw = await client.get(REDIS_KEY);
+            return parseState(raw);
+        });
+        return NextResponse.json(state, {
+            headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+        });
+    } catch (err) {
+        console.error("[SOVEREIGN GET] Redis failed:", (err as Error).message);
+        return NextResponse.json(DEFAULT_STATE, {
+            headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+        });
+    }
 }
 
-// ── POST — mutate sovereign state ──────────────────────────────────────────────
+// ── POST — single connection: read → mutate → write → respond ───────────────
 
 export async function POST(req: NextRequest) {
     let body: Record<string, unknown>;
@@ -209,135 +185,132 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Body must be valid JSON" }, { status: 400 });
     }
 
+    if (!process.env.REDIS_URL) {
+        return NextResponse.json({ error: "Redis is required for mutations — REDIS_URL not set" }, { status: 503 });
+    }
+
     const { action } = body as { action?: string };
 
-    // Fix 1: Never ghost-save. If Redis is unavailable, refuse the mutation with 503.
-    if (!redisAvailable()) {
-        return NextResponse.json({ error: "Redis is required for mutations — REDIS_URL is not set" }, { status: 503 });
-    }
-
-    let state: SovereignState;
     try {
-        state = await redisGet();
-    } catch (err) {
-        console.error("[SOVEREIGN POST] Redis read failed:", (err as Error).message);
-        return NextResponse.json({ error: "Redis unavailable" }, { status: 503 });
+        // ── One connection: read → mutate → write ────────────────────────────
+        const saved = await withRedis(async client => {
+            // READ
+            const raw = await client.get(REDIS_KEY);
+            let state = parseState(raw);
+
+            // MUTATE
+            if (action === "allocate") {
+                const { stat } = body as { stat?: string };
+                if (!stat || !(VALID_STATS as readonly string[]).includes(stat)) {
+                    throw { userError: true, msg: "Invalid stat", status: 422 };
+                }
+                if (state.availablePoints <= 0) {
+                    throw { userError: true, msg: "No available points", status: 422 };
+                }
+                state = allocateStat(state, stat as StatKey);
+
+            } else if (action === "addExp") {
+                const { amount } = body as { amount?: number };
+                if (typeof amount !== "number" || amount < 0) {
+                    throw { userError: true, msg: "amount must be a non-negative number", status: 422 };
+                }
+                state = processLevelUp({ ...state, exp: state.exp + amount });
+
+            } else if (action === "buyItem") {
+                const { itemId, name, type, description, effect, cost } = body as any;
+                if (!itemId || !name || !["consumable", "gear"].includes(type) || typeof cost !== "number") {
+                    throw { userError: true, msg: "buyItem requires: itemId, name, type (consumable|gear), cost", status: 422 };
+                }
+                if (state.gold < cost) {
+                    throw { userError: true, msg: "Insufficient gold", status: 422 };
+                }
+                const normalizedEffect = type === "consumable"
+                    ? normalizeConsumableEffect((effect ?? {}) as Record<string, unknown>)
+                    : normalizeGearEffect((effect ?? {}) as Record<string, unknown>);
+
+                const existingIdx = state.inventory.findIndex(i => i.id === itemId);
+                if (existingIdx >= 0 && type === "consumable") {
+                    state = {
+                        ...state,
+                        gold:      state.gold - cost,
+                        inventory: state.inventory.map((item, i) =>
+                            i === existingIdx ? { ...item, quantity: item.quantity + 1 } : item
+                        ),
+                    };
+                } else if (existingIdx >= 0 && type === "gear") {
+                    throw { userError: true, msg: "You already own this item", status: 422 };
+                } else {
+                    state = {
+                        ...state,
+                        gold:      state.gold - cost,
+                        inventory: [...state.inventory, {
+                            id: itemId, name,
+                            type:        type as "consumable" | "gear",
+                            description: description ?? "",
+                            effect:      normalizedEffect,
+                            quantity:    1,
+                            equipped:    false,
+                        }],
+                    };
+                }
+
+            } else if (action === "equipItem") {
+                const { itemId } = body as { itemId?: string };
+                const idx = state.inventory.findIndex(i => i.id === itemId);
+                if (idx < 0) throw { userError: true, msg: "Item not in inventory", status: 422 };
+                const item = state.inventory[idx];
+                if (item.type !== "gear") throw { userError: true, msg: "Only gear can be equipped", status: 422 };
+                if (item.equipped)        throw { userError: true, msg: "Already equipped", status: 422 };
+                state = {
+                    ...state,
+                    inventory: state.inventory.map((i, n) => n === idx ? { ...i, equipped: true } : i),
+                };
+
+            } else if (action === "unequipItem") {
+                const { itemId } = body as { itemId?: string };
+                const idx = state.inventory.findIndex(i => i.id === itemId);
+                if (idx < 0) throw { userError: true, msg: "Item not in inventory", status: 422 };
+                if (!state.inventory[idx].equipped) throw { userError: true, msg: "Item not equipped", status: 422 };
+                state = {
+                    ...state,
+                    inventory: state.inventory.map((i, n) => n === idx ? { ...i, equipped: false } : i),
+                };
+
+            } else if (action === "consumeItem") {
+                const { itemId } = body as { itemId?: string };
+                const idx = state.inventory.findIndex(i => i.id === itemId);
+                if (idx < 0) throw { userError: true, msg: "Item not in inventory", status: 422 };
+                const item = state.inventory[idx];
+                if (item.type !== "consumable") throw { userError: true, msg: "Only consumables can be consumed", status: 422 };
+                if (item.effect.hp)  state = { ...state, hp: Math.min(state.hp + item.effect.hp, state.maxHp) };
+                if (item.effect.exp) state = processLevelUp({ ...state, exp: state.exp + item.effect.exp });
+                const newQty = item.quantity - 1;
+                state = {
+                    ...state,
+                    inventory: newQty > 0
+                        ? state.inventory.map((i, n) => n === idx ? { ...i, quantity: newQty } : i)
+                        : state.inventory.filter((_, n) => n !== idx),
+                };
+
+            } else {
+                throw { userError: true, msg: "Unknown action", status: 422 };
+            }
+
+            // WRITE — same connection, same socket, no gap
+            const json = JSON.stringify(state);
+            await client.set(REDIS_KEY, json);
+            console.log(`[SOVEREIGN POST] ${action} OK — ${json.length}b — gold=${state.gold} inv=${state.inventory.length} items`);
+
+            return state;
+        });
+
+        return NextResponse.json(saved);
+
+    } catch (err: any) {
+        if (err?.userError) {
+            return NextResponse.json({ error: err.msg }, { status: err.status });
+        }
+        console.error("[SOVEREIGN POST] Redis failed:", (err as Error).message);
+        return NextResponse.json({ error: "Redis operation failed" }, { status: 503 });
     }
-
-    // ── allocate ─────────────────────────────────────────────────────────────
-    if (action === "allocate") {
-        const { stat } = body as { stat?: string };
-        if (!stat || !(VALID_STATS as readonly string[]).includes(stat)) {
-            return NextResponse.json({ error: "Invalid stat. Must be one of: str, agi, vit, int, per" }, { status: 422 });
-        }
-        if (state.availablePoints <= 0) {
-            return NextResponse.json({ error: "No available points" }, { status: 422 });
-        }
-        state = allocateStat(state, stat as StatKey);
-
-    // ── addExp ───────────────────────────────────────────────────────────────
-    } else if (action === "addExp") {
-        const { amount } = body as { amount?: number };
-        if (typeof amount !== "number" || amount < 0) {
-            return NextResponse.json({ error: "amount must be a non-negative number" }, { status: 422 });
-        }
-        state = processLevelUp({ ...state, exp: state.exp + amount });
-
-    // ── buyItem ──────────────────────────────────────────────────────────────
-    } else if (action === "buyItem") {
-        const { itemId, name, type, description, effect, cost } = body as any;
-        if (!itemId || !name || !["consumable", "gear"].includes(type) || typeof cost !== "number") {
-            return NextResponse.json({ error: "buyItem requires: itemId, name, type (consumable|gear), cost" }, { status: 422 });
-        }
-        if (state.gold < cost) {
-            return NextResponse.json({ error: "Insufficient gold" }, { status: 422 });
-        }
-        const normalizedEffect = type === "consumable"
-            ? normalizeConsumableEffect((effect ?? {}) as Record<string, unknown>)
-            : normalizeGearEffect((effect ?? {}) as Record<string, unknown>);
-
-        const existingIdx = state.inventory.findIndex(i => i.id === itemId);
-        let newInventory: InventoryItem[];
-        if (existingIdx >= 0 && type === "consumable") {
-            newInventory = state.inventory.map((item, i) =>
-                i === existingIdx ? { ...item, quantity: item.quantity + 1 } : item
-            );
-        } else if (existingIdx >= 0 && type === "gear") {
-            return NextResponse.json({ error: "You already own this item" }, { status: 422 });
-        } else {
-            newInventory = [...state.inventory, {
-                id:          itemId,
-                name,
-                type:        type as "consumable" | "gear",
-                description: description ?? "",
-                effect:      normalizedEffect,
-                quantity:    1,
-                equipped:    false,
-            }];
-        }
-        state = { ...state, gold: state.gold - cost, inventory: newInventory };
-
-    // ── equipItem ────────────────────────────────────────────────────────────
-    // NOTE: base stats (str/agi/vit/int/per/maxHp) are NEVER modified by equip.
-    // Totals = base + equipment bonuses are computed in the frontend so there is
-    // no risk of data drift from repeated equip/unequip cycles.
-    } else if (action === "equipItem") {
-        const { itemId } = body as { itemId?: string };
-        const idx = state.inventory.findIndex(i => i.id === itemId);
-        if (idx < 0) return NextResponse.json({ error: "Item not in inventory" }, { status: 422 });
-        const item = state.inventory[idx];
-        if (item.type !== "gear") return NextResponse.json({ error: "Only gear can be equipped" }, { status: 422 });
-        if (item.equipped)        return NextResponse.json({ error: "Already equipped" }, { status: 422 });
-        state = {
-            ...state,
-            inventory: state.inventory.map((i, n) => n === idx ? { ...i, equipped: true } : i),
-        };
-
-    // ── unequipItem ──────────────────────────────────────────────────────────
-    } else if (action === "unequipItem") {
-        const { itemId } = body as { itemId?: string };
-        const idx = state.inventory.findIndex(i => i.id === itemId);
-        if (idx < 0) return NextResponse.json({ error: "Item not in inventory" }, { status: 422 });
-        const item = state.inventory[idx];
-        if (!item.equipped) return NextResponse.json({ error: "Item not equipped" }, { status: 422 });
-        state = {
-            ...state,
-            inventory: state.inventory.map((i, n) => n === idx ? { ...i, equipped: false } : i),
-        };
-
-    // ── consumeItem ──────────────────────────────────────────────────────────
-    } else if (action === "consumeItem") {
-        const { itemId } = body as { itemId?: string };
-        const idx = state.inventory.findIndex(i => i.id === itemId);
-        if (idx < 0) return NextResponse.json({ error: "Item not in inventory" }, { status: 422 });
-        const item = state.inventory[idx];
-        if (item.type !== "consumable") return NextResponse.json({ error: "Only consumables can be consumed" }, { status: 422 });
-        // Apply consumable effect
-        if (item.effect.hp)  state = { ...state, hp: Math.min(state.hp + item.effect.hp, state.maxHp) };
-        if (item.effect.exp) state = processLevelUp({ ...state, exp: state.exp + item.effect.exp });
-        // Decrement quantity or remove
-        const newQty = item.quantity - 1;
-        state = {
-            ...state,
-            inventory: newQty > 0
-                ? state.inventory.map((i, n) => n === idx ? { ...i, quantity: newQty } : i)
-                : state.inventory.filter((_, n) => n !== idx),
-        };
-
-    } else {
-        return NextResponse.json(
-            { error: "Unknown action. Supported: allocate | addExp | buyItem | equipItem | unequipItem | consumeItem" },
-            { status: 422 },
-        );
-    }
-
-    // redisAvailable() is guaranteed true here (checked above)
-    try {
-        await redisSet(state);
-    } catch (err) {
-        console.error("[SOVEREIGN POST] Redis write failed:", (err as Error).message);
-        return NextResponse.json({ error: "Redis write failed" }, { status: 503 });
-    }
-
-    return NextResponse.json(state);
 }

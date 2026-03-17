@@ -53,7 +53,7 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
             });
         const flatHpBonus = (base.inventory ?? [])
             .filter(item => item.equipped && item.type === "gear")
-            .reduce((sum, item) => sum + (item.effect.hp ?? 0), 0);
+            .reduce((sum, item) => sum + (Number(item.effect.hp) || 0), 0);
         stats.maxHp = 500 + (stats.vit * 10) + flatHpBonus;
         return stats;
     };
@@ -62,7 +62,7 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
     const getEquipBonus = (stat: string): number =>
         (sovereign?.inventory ?? [])
             .filter(item => item.equipped && item.type === "gear")
-            .reduce((total, item) => total + (item.effect[stat] ?? 0), 0);
+            .reduce((total, item) => total + (Number(item.effect[stat]) || 0), 0);
 
     const totalMaxHp = currentStats?.maxHp ?? 0;
     const currentHp  = Math.min(sovereign?.hp ?? 0, totalMaxHp);

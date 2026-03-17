@@ -118,26 +118,19 @@ const SOVEREIGN_DEFAULTS: SovereignState = {
     gold: 5000, inventory: [],
 };
 
-async function sovereignGet(): Promise<SovereignState> {
-    return withRedis(async client => {
-        const raw = await client.get(SOVEREIGN_KEY);
-        if (!raw) return { ...SOVEREIGN_DEFAULTS };
-        try {
-            const parsed = JSON.parse(raw) as SovereignState;
-            // Fix 3: backfill new fields so an old saved state never wipes gold/inventory
-            return {
-                ...SOVEREIGN_DEFAULTS,
-                ...parsed,
-                gold:      parsed.gold      ?? SOVEREIGN_DEFAULTS.gold,
-                inventory: parsed.inventory ?? [],
-            };
-        }
-        catch { return { ...SOVEREIGN_DEFAULTS }; }
-    });
-}
-
-async function sovereignSet(state: SovereignState): Promise<void> {
-    await withRedis(client => client.set(SOVEREIGN_KEY, JSON.stringify(state)));
+function parseSovereignState(raw: string | null): SovereignState {
+    if (!raw) return { ...SOVEREIGN_DEFAULTS };
+    try {
+        const p = JSON.parse(raw) as Partial<SovereignState>;
+        return {
+            ...SOVEREIGN_DEFAULTS,
+            ...p,
+            gold:      p.gold      ?? SOVEREIGN_DEFAULTS.gold,
+            inventory: Array.isArray(p.inventory) ? p.inventory : [],
+        };
+    } catch {
+        return { ...SOVEREIGN_DEFAULTS };
+    }
 }
 
 function applyExpGain(state: SovereignState, amount: number): SovereignState {
@@ -154,11 +147,16 @@ function applyExpGain(state: SovereignState, amount: number): SovereignState {
     return { ...state, level, exp, maxExp, title, availablePoints };
 }
 
+/** Single-connection atomic read → mutate EXP → write. Never opens two connections. */
 async function injectSovereignExp(expReward: number): Promise<void> {
-    const current = await sovereignGet();
-    const updated = applyExpGain(current, expReward);
-    await sovereignSet(updated);
-    console.log(`[SOVEREIGN] +${expReward} EXP injected. Level: ${current.level} → ${updated.level}`);
+    await withRedis(async client => {
+        const raw     = await client.get(SOVEREIGN_KEY);
+        const current = parseSovereignState(raw);
+        const updated = applyExpGain(current, expReward);
+        const json    = JSON.stringify(updated);
+        await client.set(SOVEREIGN_KEY, json);
+        console.log(`[SOVEREIGN] +${expReward} EXP — ${json.length}b — gold=${updated.gold} inv=${updated.inventory.length} — Lv${current.level}→${updated.level}`);
+    });
 }
 
 // ── POST — receive agent ping ─────────────────────────────────────────────────
