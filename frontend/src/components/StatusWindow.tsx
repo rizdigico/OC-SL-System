@@ -44,11 +44,12 @@ export function StatusWindow({ isOpen, onClose, user, setUser }: StatusWindowPro
         (base.inventory ?? [])
             .filter(item => item.equipped && item.type === "gear")
             .forEach(item => {
-                stats.str += item.effect.str ?? 0;
-                stats.agi += item.effect.agi ?? 0;
-                stats.vit += item.effect.vit ?? 0;
-                stats.int += item.effect.int ?? 0;
-                stats.per += item.effect.per ?? 0;
+                // Fix 4: Number() coerces stringified numbers; || 0 guards NaN
+                stats.str += Number(item.effect.str) || 0;
+                stats.agi += Number(item.effect.agi) || 0;
+                stats.vit += Number(item.effect.vit) || 0;
+                stats.int += Number(item.effect.int) || 0;
+                stats.per += Number(item.effect.per) || 0;
             });
         const flatHpBonus = (base.inventory ?? [])
             .filter(item => item.equipped && item.type === "gear")

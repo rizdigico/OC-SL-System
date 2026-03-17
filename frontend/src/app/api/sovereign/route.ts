@@ -72,10 +72,12 @@ const STAT_KEY_MAP: Record<string, string> = {
 function normalizeGearEffect(raw: Record<string, unknown>): Record<string, number> {
     const result: Record<string, number> = {};
     for (const [k, v] of Object.entries(raw)) {
-        if (typeof v !== "number") continue;  // skip slot, paralysis, etc.
+        // Fix 2: coerce — accept both number and stringified number; discard only on NaN
+        const parsed = Number(v);
+        if (isNaN(parsed)) continue;  // skip slot, paralysis, boolean flags, etc.
         const key = STAT_KEY_MAP[k] ?? k;
         if ((VALID_STATS as readonly string[]).includes(key) || key === "hp") {
-            result[key] = v;
+            result[key] = parsed;
         }
     }
     return result;
@@ -84,11 +86,13 @@ function normalizeGearEffect(raw: Record<string, unknown>): Record<string, numbe
 function normalizeConsumableEffect(raw: Record<string, unknown>): Record<string, number> {
     const result: Record<string, number> = {};
     for (const [k, v] of Object.entries(raw)) {
-        if (typeof v !== "number") continue;
+        // Fix 2: coerce — accept both number and stringified number; discard only on NaN
+        const parsed = Number(v);
+        if (isNaN(parsed)) continue;
         // For consumables: vitality = HP restore, not stat increase
-        if (k === "vitality") { result["hp"] = v; continue; }
+        if (k === "vitality") { result["hp"] = parsed; continue; }
         const key = STAT_KEY_MAP[k] ?? k;
-        result[key] = v;
+        result[key] = parsed;
     }
     return result;
 }
@@ -207,16 +211,17 @@ export async function POST(req: NextRequest) {
 
     const { action } = body as { action?: string };
 
+    // Fix 1: Never ghost-save. If Redis is unavailable, refuse the mutation with 503.
+    if (!redisAvailable()) {
+        return NextResponse.json({ error: "Redis is required for mutations — REDIS_URL is not set" }, { status: 503 });
+    }
+
     let state: SovereignState;
-    if (redisAvailable()) {
-        try {
-            state = await redisGet();
-        } catch (err) {
-            console.error("[SOVEREIGN POST] Redis read failed:", (err as Error).message);
-            return NextResponse.json({ error: "Redis unavailable" }, { status: 503 });
-        }
-    } else {
-        state = { ...DEFAULT_STATE };
+    try {
+        state = await redisGet();
+    } catch (err) {
+        console.error("[SOVEREIGN POST] Redis read failed:", (err as Error).message);
+        return NextResponse.json({ error: "Redis unavailable" }, { status: 503 });
     }
 
     // ── allocate ─────────────────────────────────────────────────────────────
@@ -326,13 +331,12 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    if (redisAvailable()) {
-        try {
-            await redisSet(state);
-        } catch (err) {
-            console.error("[SOVEREIGN POST] Redis write failed:", (err as Error).message);
-            return NextResponse.json({ error: "Redis write failed" }, { status: 503 });
-        }
+    // redisAvailable() is guaranteed true here (checked above)
+    try {
+        await redisSet(state);
+    } catch (err) {
+        console.error("[SOVEREIGN POST] Redis write failed:", (err as Error).message);
+        return NextResponse.json({ error: "Redis write failed" }, { status: 503 });
     }
 
     return NextResponse.json(state);

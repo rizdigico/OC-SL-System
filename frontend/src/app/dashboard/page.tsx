@@ -322,7 +322,7 @@ function DashboardContent() {
     const getEquipBonus = (stat: string): number =>
         (sovereign?.inventory ?? [])
             .filter(item => item.equipped && item.type === "gear")
-            .reduce((total, item) => total + ((item.effect as any)[stat] ?? 0), 0);
+            .reduce((total, item) => total + (Number((item.effect as any)[stat]) || 0), 0);
 
     const totalStr   = (sovereign?.str   ?? user.stats.strength)     + getEquipBonus("str");
     const totalAgi   = (sovereign?.agi   ?? user.stats.agility)      + getEquipBonus("agi");

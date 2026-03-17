@@ -122,7 +122,16 @@ async function sovereignGet(): Promise<SovereignState> {
     return withRedis(async client => {
         const raw = await client.get(SOVEREIGN_KEY);
         if (!raw) return { ...SOVEREIGN_DEFAULTS };
-        try { return JSON.parse(raw) as SovereignState; }
+        try {
+            const parsed = JSON.parse(raw) as SovereignState;
+            // Fix 3: backfill new fields so an old saved state never wipes gold/inventory
+            return {
+                ...SOVEREIGN_DEFAULTS,
+                ...parsed,
+                gold:      parsed.gold      ?? SOVEREIGN_DEFAULTS.gold,
+                inventory: parsed.inventory ?? [],
+            };
+        }
         catch { return { ...SOVEREIGN_DEFAULTS }; }
     });
 }
