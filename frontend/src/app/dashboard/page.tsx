@@ -87,7 +87,7 @@ const MOCK_USER = {
         sense:        30,
         intelligence: 60,
         statPoints:   5,
-        gold:         14500,
+        gold:         5000,
         mana:         320,
         fatigue:      12,
     },
@@ -424,7 +424,7 @@ function DashboardContent() {
                             <span>PLAYER STATUS</span>
                             <div className="ml-auto flex items-center gap-3">
                                 <div className="text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-0.5 text-xs font-bold tracking-wider">
-                                    {sovereign?.gold ?? user.stats.gold} G
+                                    {sovereign?.gold ?? 0} G
                                 </div>
                                 <button onClick={() => router.push('/settings')} className="text-[#7a9abf] hover:text-[#11D2EF] transition-colors">
                                     <Settings className="w-4 h-4" />

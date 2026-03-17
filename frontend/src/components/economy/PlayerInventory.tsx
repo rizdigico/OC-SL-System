@@ -2,11 +2,15 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Package, Zap } from "lucide-react";
+import { useSovereign } from "@/context/SovereignContext";
 import {
+    ITEM_DATABASE,
     RARITY_COLOR,
     SLOT_ICON,
     type Item,
     type EquipSlot,
+    type ItemCategory,
+    type ItemRarity,
 } from "@/lib/ItemData";
 
 // ── Paper-doll slot layout ─────────────────────────────────────────────────────
@@ -145,6 +149,22 @@ function EquipSlotCard({
     );
 }
 
+// ── Sovereign → Item lookup helper ──────────────────────────────────────────────
+
+function lookupItem(sovId: string, sovName: string, sovType: string, sovDesc: string): Item {
+    const catalog = ITEM_DATABASE.find(c => c.id === sovId);
+    if (catalog) return catalog;
+    // Fallback for items not in the static catalog (e.g. bought from Express shop)
+    return {
+        id:          sovId,
+        name:        sovName,
+        category:    (sovType === "consumable" ? "Consumable" : "Gear") as ItemCategory,
+        cost:        0,
+        rarity:      "Common" as ItemRarity,
+        description: sovDesc,
+    };
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 interface PlayerInventoryProps {
@@ -154,76 +174,64 @@ interface PlayerInventoryProps {
     setUser: (updater: (prev: any) => any) => void;
 }
 
-export function PlayerInventory({ isOpen, onClose, user, setUser }: PlayerInventoryProps) {
-    const inventory: Item[]                        = user?.inventory ?? [];
-    const equipped: Partial<Record<EquipSlot, Item>> = user?.equipped  ?? {};
+export function PlayerInventory({ isOpen, onClose }: PlayerInventoryProps) {
+    const { sovereign, updateSovereign } = useSovereign();
 
-    // Items not currently equipped (consumables always show here; gear only if not in a slot)
+    // Build Item list + equipped map from sovereign state
+    const sovereignInv = sovereign?.inventory ?? [];
+    const inventory: Item[] = sovereignInv.map(sov =>
+        lookupItem(sov.id, sov.name, sov.type, sov.description),
+    );
+
+    const equipped: Partial<Record<EquipSlot, Item>> = {};
+    sovereignInv.filter(sov => sov.equipped).forEach(sov => {
+        const item = lookupItem(sov.id, sov.name, sov.type, sov.description);
+        if (item.slot) equipped[item.slot] = item;
+    });
+
+    // Items not currently equipped (consumables always show; gear only if not equipped)
     const unequipped = inventory.filter((item: Item) => {
         if (!item.slot) return true; // consumables
         return !equipped[item.slot] || equipped[item.slot]?.id !== item.id;
     });
 
-    const handleEquip = (item: Item) => {
+    const handleEquip = async (item: Item) => {
         if (!item.slot) return;
-        const slot = item.slot;
 
-        setUser((prev: any) => {
-            const prevEquipped: Partial<Record<EquipSlot, Item>> = prev.equipped ?? {};
-            const prevInv: Item[] = prev.inventory ?? [];
+        // If slot is already occupied, unequip the old item first
+        const oldItem = equipped[item.slot];
+        if (oldItem) {
+            const unequipRes = await fetch("/api/sovereign", {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify({ action: "unequipItem", itemId: oldItem.id }),
+            });
+            if (!unequipRes.ok) return;
+            updateSovereign(await unequipRes.json());
+        }
 
-            // Build updated stats: first remove old item's buff, then add new item's buff
-            let stats = { ...prev.stats };
-
-            const oldItem = prevEquipped[slot];
-            if (oldItem?.statBuff) {
-                for (const [key, val] of Object.entries(oldItem.statBuff)) {
-                    stats[key] = Math.max(0, (stats[key] ?? 0) - (val as number));
-                }
-            }
-            if (item.statBuff) {
-                for (const [key, val] of Object.entries(item.statBuff)) {
-                    stats[key] = (stats[key] ?? 0) + (val as number);
-                }
-            }
-
-            // Build new inventory: remove newly equipped item, re-add old item if it existed
-            const newInv = prevInv.filter((i: Item) => i.id !== item.id);
-            if (oldItem) newInv.push(oldItem);
-
-            return {
-                ...prev,
-                stats,
-                equipped:  { ...prevEquipped, [slot]: item },
-                inventory: newInv,
-            };
-        });
+        // Now equip the new item
+        try {
+            const res = await fetch("/api/sovereign", {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify({ action: "equipItem", itemId: item.id }),
+            });
+            if (res.ok) updateSovereign(await res.json());
+        } catch { /* sovereign stays unchanged */ }
     };
 
-    const handleUnequip = (slot: EquipSlot) => {
-        setUser((prev: any) => {
-            const prevEquipped: Partial<Record<EquipSlot, Item>> = prev.equipped ?? {};
-            const item = prevEquipped[slot];
-            if (!item) return prev;
-
-            // Reverse the stat buff
-            let stats = { ...prev.stats };
-            if (item.statBuff) {
-                for (const [key, val] of Object.entries(item.statBuff)) {
-                    stats[key] = Math.max(0, (stats[key] ?? 0) - (val as number));
-                }
-            }
-
-            const newEquipped = { ...prevEquipped };
-            delete newEquipped[slot];
-
-            return {
-                ...prev,
-                stats,
-                equipped:  newEquipped,
-                inventory: [...(prev.inventory ?? []), item],
-            };
-        });
+    const handleUnequip = async (slot: EquipSlot) => {
+        const item = equipped[slot];
+        if (!item) return;
+        try {
+            const res = await fetch("/api/sovereign", {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify({ action: "unequipItem", itemId: item.id }),
+            });
+            if (res.ok) updateSovereign(await res.json());
+        } catch { /* sovereign stays unchanged */ }
     };
 
     const totalEquipped = Object.values(equipped).filter(Boolean).length;

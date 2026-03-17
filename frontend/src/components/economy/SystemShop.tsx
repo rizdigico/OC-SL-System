@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ShoppingCart, Zap, Shield, Crown, Package } from "lucide-react";
+import { useSovereign } from "@/context/SovereignContext";
 import {
     ITEM_DATABASE,
     RARITY_COLOR,
@@ -138,7 +139,7 @@ function ItemCard({
                             : { color: "#3f3f46", borderColor: "rgba(255,255,255,0.06)", background: "transparent", cursor: "not-allowed" }
                     }
                 >
-                    {purchased ? "✓ BOUGHT" : canAfford ? "BUY" : "NEED GOLD"}
+                    {purchased ? "BOUGHT" : canAfford ? "BUY" : "NEED GOLD"}
                 </motion.button>
             </div>
         </motion.div>
@@ -154,31 +155,63 @@ interface SystemShopProps {
     setUser: (updater: (prev: any) => any) => void;
 }
 
-export function SystemShop({ isOpen, onClose, user, setUser }: SystemShopProps) {
+export function SystemShop({ isOpen, onClose }: SystemShopProps) {
     const [activeCategory, setActiveCategory] = useState<ItemCategory | "All">("All");
     const [justBought,     setJustBought]     = useState<Set<string>>(new Set());
+    const { sovereign, updateSovereign }      = useSovereign();
 
-    const gold     = user?.stats?.gold ?? 0;
-    const inventory: Item[] = user?.inventory ?? [];
-    const ownedIds = new Set(inventory.map((i: Item) => i.id));
+    const gold     = sovereign?.gold ?? 0;
+    const ownedIds = new Set((sovereign?.inventory ?? []).map(i => i.id));
 
     const visibleItems = activeCategory === "All"
         ? ITEM_DATABASE
         : ITEM_DATABASE.filter(i => i.category === activeCategory);
 
-    const handleBuy = (item: Item) => {
+    const handleBuy = async (item: Item) => {
         if (gold < item.cost) return;
 
-        setUser((prev: any) => ({
-            ...prev,
-            stats:     { ...prev.stats, gold: prev.stats.gold - item.cost },
-            inventory: [...(prev.inventory ?? []), item],
-        }));
+        // Convert statBuff (long stat names) → sovereign effect format
+        const effect: Record<string, number> = {};
+        if (item.statBuff) {
+            for (const [k, v] of Object.entries(item.statBuff)) {
+                if (v !== undefined) effect[k] = v;
+            }
+        }
+        // Parse human-readable consumable effect into numeric values
+        if (item.category === "Consumable" && item.effect) {
+            const m = item.effect.match(/([+-]?\d+)\s*(HP|MP|Fatigue|EXP)/i);
+            if (m) {
+                const val  = parseInt(m[1]);
+                const type = m[2].toLowerCase();
+                if (type === "hp")      effect.hp      = val;
+                else if (type === "mp") effect.mp      = val;
+                else if (type === "fatigue") effect.fatigue = val;
+                else if (type === "exp")    effect.exp = val;
+            }
+        }
 
-        setJustBought(prev => new Set([...prev, item.id]));
-        setTimeout(() => {
-            setJustBought(prev => { const n = new Set(prev); n.delete(item.id); return n; });
-        }, 2000);
+        try {
+            const res = await fetch("/api/sovereign", {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify({
+                    action:      "buyItem",
+                    itemId:      item.id,
+                    name:        item.name,
+                    type:        item.category === "Consumable" ? "consumable" : "gear",
+                    description: item.description,
+                    effect,
+                    cost:        item.cost,
+                }),
+            });
+            if (res.ok) {
+                updateSovereign(await res.json());
+                setJustBought(prev => new Set([...prev, item.id]));
+                setTimeout(() => {
+                    setJustBought(prev => { const n = new Set(prev); n.delete(item.id); return n; });
+                }, 2000);
+            }
+        } catch { /* network error — sovereign stays unchanged */ }
     };
 
     return (

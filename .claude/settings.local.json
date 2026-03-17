@@ -6,7 +6,8 @@
       "Bash(npx tsc --noEmit)",
       "Bash(echo \"EXIT:$?\")",
       "Skill(update-config)",
-      "Bash(claude:*)"
+      "Bash(claude:*)",
+      "Bash(npx next:*)"
     ]
   }
 }
