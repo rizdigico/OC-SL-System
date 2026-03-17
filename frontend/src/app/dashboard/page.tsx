@@ -119,7 +119,7 @@ function buildUserFromAssessment(r: any) {
 }
 
 function DashboardContent() {
-    const { sovereign, refreshSovereign } = useSovereign();
+    const { sovereign, refreshSovereign, updateSovereign } = useSovereign();
     const [user, setUser] = useState<any>(() => {
         if (typeof window === "undefined") return MOCK_USER;
         try {
@@ -149,10 +149,11 @@ function DashboardContent() {
 
     const handleCompleteQuest = async (quest: any) => {
         if (quest.isSovereign) {
-            await fetch('/api/sovereign', {
+            const res = await fetch('/api/sovereign', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'addExp', amount: quest.rewards?.exp ?? 0 }),
+                body: JSON.stringify({ action: 'completeQuest', questId: quest._id }),
             });
+            if (res.ok) updateSovereign(await res.json());
             return;
         }
         const token = localStorage.getItem("system_token");

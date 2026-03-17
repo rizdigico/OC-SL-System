@@ -35,7 +35,11 @@ export function SovereignProvider({ children }: { children: React.ReactNode }) {
         setSovereign(state);
     }, []);
 
-    useEffect(() => { refreshSovereign(); }, [refreshSovereign]);
+    useEffect(() => {
+        refreshSovereign();
+        const id = setInterval(refreshSovereign, 5000);
+        return () => clearInterval(id);
+    }, [refreshSovereign]);
 
     return (
         <SovereignContext.Provider value={{ sovereign, refreshSovereign, updateSovereign }}>

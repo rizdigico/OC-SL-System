@@ -90,21 +90,22 @@ function AlertCard({ alert }: { alert: SovereignAlert }) {
 
 export function SystemAlerts() {
     const { sovereign } = useSovereign();
+    // seenRef: IDs we've already scheduled a dismiss timer for (prevents duplicates across polls)
+    // dismissedRef: IDs whose 5s timer has fired (hides them from render)
+    const seenRef      = useRef<Set<string>>(new Set());
     const dismissedRef = useRef<Set<string>>(new Set());
     const [, forceUpdate] = React.useReducer(x => x + 1, 0);
 
     useEffect(() => {
         if (!sovereign) return;
-        const timers: ReturnType<typeof setTimeout>[] = [];
         sovereign.alerts.forEach(alert => {
-            if (!dismissedRef.current.has(alert.id)) {
-                timers.push(setTimeout(() => {
-                    dismissedRef.current.add(alert.id);
-                    forceUpdate();
-                }, 5000));
-            }
+            if (seenRef.current.has(alert.id)) return;
+            seenRef.current.add(alert.id);
+            setTimeout(() => {
+                dismissedRef.current.add(alert.id);
+                forceUpdate();
+            }, 5000);
         });
-        return () => timers.forEach(clearTimeout);
     }, [sovereign?.alerts]);
 
     const visible = (sovereign?.alerts ?? []).filter(a => !dismissedRef.current.has(a.id));

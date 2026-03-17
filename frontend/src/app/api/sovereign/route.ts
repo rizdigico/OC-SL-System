@@ -145,14 +145,22 @@ function resolveTitle(level: number, currentTitle: string): string {
 
 function processLevelUp(state: SovereignState): SovereignState {
     let { level, exp, maxExp, title, availablePoints } = state;
+    const lvlAlerts: SovereignAlert[] = [];
     while (exp >= maxExp) {
         exp             -= maxExp;
         level           += 1;
         availablePoints += 5;
         maxExp           = Math.round(maxExp * 1.2);
+        lvlAlerts.push({
+            id:        `lvl-${level}-${Date.now()}`,
+            message:   `[SYSTEM ALARM] You have reached Level ${level}!`,
+            type:      'success',
+            timestamp: Date.now(),
+        });
     }
     title = resolveTitle(level, title);
-    return { ...state, level, exp, maxExp, title, availablePoints };
+    const alerts = [...state.alerts, ...lvlAlerts].slice(-5);
+    return { ...state, level, exp, maxExp, title, availablePoints, alerts };
 }
 
 function allocateStat(state: SovereignState, stat: StatKey): SovereignState {
@@ -305,6 +313,18 @@ export async function POST(req: NextRequest) {
                         ? state.inventory.map((i, n) => n === idx ? { ...i, quantity: newQty } : i)
                         : state.inventory.filter((_, n) => n !== idx),
                 };
+
+            } else if (action === "completeQuest") {
+                const { questId } = body as { questId?: string };
+                if (!questId) throw { userError: true, msg: "completeQuest requires: questId", status: 422 };
+                const quest = state.quests.find(q => q.id === questId);
+                if (!quest) throw { userError: true, msg: "Quest not found", status: 404 };
+                state = processLevelUp({
+                    ...state,
+                    exp:    state.exp  + quest.expReward,
+                    gold:   state.gold + quest.goldReward,
+                    quests: state.quests.filter(q => q.id !== questId),
+                });
 
             } else if (action === "addAlert") {
                 const { id, message, type } = body as { id?: string; message?: string; type?: string };
