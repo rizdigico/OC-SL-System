@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ShoppingCart, AlertCircle } from "lucide-react";
 import { useSystemAudio } from "@/hooks/useSystemAudio";
+import { useSovereign } from "@/context/SovereignContext";
 
 interface ShopInterfaceProps {
     isOpen: boolean;
@@ -16,6 +17,7 @@ export function ShopInterface({ isOpen, onClose, user, setUser }: ShopInterfaceP
     const [purchaseSuccess, setPurchaseSuccess] = useState<string | null>(null);
     const [isFlashing, setIsFlashing] = useState(false);
     const { playClick, playError } = useSystemAudio();
+    const { sovereign, refreshSovereign } = useSovereign();
 
     useEffect(() => {
         if (!isOpen) return;
@@ -42,7 +44,7 @@ export function ShopInterface({ isOpen, onClose, user, setUser }: ShopInterfaceP
         setPurchaseSuccess(null);
         setIsFlashing(false);
 
-        if (user.stats.gold < item.cost) {
+        if ((sovereign?.gold ?? 0) < item.cost) {
             playError();
             setErrorMsg("SYSTEM: INSUFFICIENT FUNDS");
             setIsFlashing(true);
@@ -50,23 +52,23 @@ export function ShopInterface({ isOpen, onClose, user, setUser }: ShopInterfaceP
             return;
         }
 
-        const token = localStorage.getItem("system_token");
-        if (!token) return;
-
         try {
-            const res = await fetch("http://localhost:5000/api/shop/buy", {
+            const res = await fetch("/api/sovereign", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({ itemId: item._id, quantity: 1 })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action:      "buyItem",
+                    itemId:      item._id,
+                    name:        item.name,
+                    type:        item.type === "gear" ? "gear" : "consumable",
+                    description: item.description ?? "",
+                    effect:      item.effect ?? {},
+                    cost:        item.cost,
+                }),
             });
 
             if (res.ok) {
-                const data = await res.json();
-                setUser(data.user); // The API returns { message, user }
-                setErrorMsg(null);
+                await refreshSovereign();
                 setPurchaseSuccess(`Item Acquired: ${item.name}`);
                 setTimeout(() => setPurchaseSuccess(null), 3000);
             } else {
@@ -108,7 +110,7 @@ export function ShopInterface({ isOpen, onClose, user, setUser }: ShopInterfaceP
                                 <div className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors duration-300 ${isFlashing ? 'bg-red-500/20 border-red-500' : 'bg-[#FFD700]/10 border-[#FFD700]/30'}`}>
                                     <span className={`text-sm font-caros uppercase ${isFlashing ? 'text-red-400' : 'text-gray-400'}`}>Gold</span>
                                     <span className={`font-bold text-xl ${isFlashing ? 'text-red-500 drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]' : 'text-[#FFD700] drop-shadow-[0_0_5px_rgba(255,215,0,0.5)]'}`}>
-                                        {user.stats.gold}
+                                        {sovereign?.gold ?? 0}
                                     </span>
                                 </div>
                                 <button
