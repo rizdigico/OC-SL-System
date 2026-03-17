@@ -115,7 +115,7 @@ const SOVEREIGN_DEFAULTS: SovereignState = {
     level: 17, exp: 4200, maxExp: 7009, title: "Wolf Slayer",
     hp: 900, maxHp: 900, fatigue: 12,
     str: 40, agi: 35, vit: 40, int: 60, per: 30, availablePoints: 5,
-    gold: 5000, inventory: [],
+    gold: 5000, inventory: [], alerts: [], quests: [],
 };
 
 function parseSovereignState(raw: string | null): SovereignState {
