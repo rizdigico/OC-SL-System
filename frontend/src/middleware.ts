@@ -29,6 +29,25 @@ export function middleware(req: NextRequest): NextResponse {
         return NextResponse.next();
     }
 
+    // ── 1b. /api/sovereign — also accept the Architect's Bearer token ─────────
+    //    The route is still reachable via normal Basic Auth (browser sessions).
+    //    This block only fires when a Bearer header is present so browser
+    //    requests fall through to the Basic Auth check below as before.
+    if (req.nextUrl.pathname.startsWith("/api/sovereign")) {
+        const authHeader = req.headers.get("authorization") ?? "";
+        if (authHeader.startsWith("Bearer ")) {
+            const secret = process.env.OPENCLAW_SECRET
+                        ?? process.env.SOVEREIGN_SECRET_KEY
+                        ?? "SOVEREIGN_SECRET_KEY";
+            if (authHeader === `Bearer ${secret}`) {
+                return NextResponse.next();
+            }
+            // Bad Bearer token → reject immediately, don't fall into Basic Auth
+            return unauthorized();
+        }
+        // No Bearer header → fall through to Basic Auth check (normal browser flow)
+    }
+
     // ── 2. Basic Auth check for every other route ─────────────────────────────
     const authHeader = req.headers.get("authorization") ?? "";
 
