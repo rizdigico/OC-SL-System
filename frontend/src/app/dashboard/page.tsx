@@ -21,6 +21,7 @@ import { DevPanel } from "@/components/DevPanel";
 import { MonarchDomain } from "@/components/MonarchDomain";
 import { ArchitectsDemiseDungeon } from "@/components/ArchitectsDemiseDungeon";
 import { ThroneRoom } from "@/components/ThroneRoom";
+import { SystemAlerts } from "@/components/SystemAlerts";
 
 // ── Error Boundary ─────────────────────────────────────────────────────────────
 
@@ -147,6 +148,13 @@ function DashboardContent() {
     // checkPenaltyStatus — GET /api/users/me/penalty-status (30 s interval)
 
     const handleCompleteQuest = async (quest: any) => {
+        if (quest.isSovereign) {
+            await fetch('/api/sovereign', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'addExp', amount: quest.rewards?.exp ?? 0 }),
+            });
+            return;
+        }
         const token = localStorage.getItem("system_token");
         if (!token) return;
         try {
@@ -324,6 +332,14 @@ function DashboardContent() {
             .filter(item => item.equipped && item.type === "gear")
             .reduce((total, item) => total + (Number((item.effect as any)[stat]) || 0), 0);
 
+    const sovereignQuestsAdapted = (sovereign?.quests ?? []).map(q => ({
+        _id: q.id, title: q.title, description: q.description,
+        difficulty: 'B' as const, type: 'system' as const,
+        rewards: { exp: q.expReward, gold: q.goldReward },
+        objectives: [], isSovereign: true,
+    }));
+    const allQuests = [...quests, ...sovereignQuestsAdapted];
+
     const totalStr   = (sovereign?.str   ?? user.stats.strength)     + getEquipBonus("str");
     const totalAgi   = (sovereign?.agi   ?? user.stats.agility)      + getEquipBonus("agi");
     const totalVit   = (sovereign?.vit   ?? user.stats.vitality)     + getEquipBonus("vit");
@@ -337,6 +353,7 @@ function DashboardContent() {
     return (
         <DashboardErrorBoundary>
         <React.Fragment>
+            <SystemAlerts />
             <StatusWindow isOpen={isStatusOpen} onClose={() => setIsStatusOpen(false)} user={user} setUser={setUser} />
             <SystemShop isOpen={isShopOpen} onClose={() => setIsShopOpen(false)} user={user} setUser={setUser} />
             <PlayerInventory isOpen={isInventoryOpen} onClose={() => setIsInventoryOpen(false)} user={user} setUser={setUser} />
@@ -696,7 +713,7 @@ function DashboardContent() {
                                         <span className="sl-notif-icon">!</span>
                                         <span>QUEST BOARD</span>
                                         <span className="ml-2 text-xs sl-text-dim normal-case tracking-normal font-normal">
-                                            [{quests.length} active]
+                                            [{allQuests.length} active]
                                         </span>
                                     </div>
 
@@ -712,7 +729,7 @@ function DashboardContent() {
                                                 }}
                                             />
                                         ) : (
-                                            <MobList quests={quests} onComplete={handleEngageMob} onEnterBoss={handleEnterBoss} />
+                                            <MobList quests={allQuests} onComplete={handleEngageMob} onEnterBoss={handleEnterBoss} />
                                         )}
                                     </div>
 

@@ -17,6 +17,14 @@ export interface InventoryItem {
     equipped:    boolean;
 }
 
+export interface SovereignAlert {
+    id: string; message: string; type: 'info' | 'warning' | 'success'; timestamp: number;
+}
+export interface SovereignQuest {
+    id: string; title: string; description: string;
+    expReward: number; goldReward: number; status: 'active';
+}
+
 export interface SovereignState {
     level:           number;
     exp:             number;
@@ -33,6 +41,8 @@ export interface SovereignState {
     availablePoints: number;
     gold:            number;
     inventory:       InventoryItem[];
+    alerts:          SovereignAlert[];
+    quests:          SovereignQuest[];
 }
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
@@ -53,6 +63,8 @@ const DEFAULT_STATE: SovereignState = {
     availablePoints: 5,
     gold:            5000,
     inventory:       [],
+    alerts:          [],
+    quests:          [],
 };
 
 const REDIS_KEY   = "sovereign_state";
@@ -114,6 +126,8 @@ function parseState(raw: string | null): SovereignState {
             ...p,
             gold:      p.gold      ?? DEFAULT_STATE.gold,
             inventory: Array.isArray(p.inventory) ? p.inventory : [],
+            alerts:    Array.isArray(p.alerts)    ? p.alerts    : [],
+            quests:    Array.isArray(p.quests)    ? p.quests    : [],
         };
     } catch {
         return { ...DEFAULT_STATE };
@@ -292,6 +306,21 @@ export async function POST(req: NextRequest) {
                         : state.inventory.filter((_, n) => n !== idx),
                 };
 
+            } else if (action === "addAlert") {
+                const { id, message, type } = body as { id?: string; message?: string; type?: string };
+                if (!id || !message || !['info','warning','success'].includes(type ?? ''))
+                    throw { userError: true, msg: "addAlert requires: id, message, type", status: 422 };
+                const newAlert: SovereignAlert = { id, message, type: type as SovereignAlert['type'], timestamp: Date.now() };
+                state = { ...state, alerts: [...state.alerts, newAlert].slice(-5) };
+
+            } else if (action === "addQuest") {
+                const { id, title, description, expReward, goldReward } = body as any;
+                if (!id || !title || typeof expReward !== 'number' || typeof goldReward !== 'number')
+                    throw { userError: true, msg: "addQuest requires: id, title, expReward, goldReward", status: 422 };
+                const newQuest: SovereignQuest = { id, title, description: description ?? '', expReward, goldReward, status: 'active' };
+                if (!state.quests.find(q => q.id === id))
+                    state = { ...state, quests: [...state.quests, newQuest] };
+
             } else {
                 throw { userError: true, msg: "Unknown action", status: 422 };
             }
@@ -299,7 +328,7 @@ export async function POST(req: NextRequest) {
             // WRITE — same connection, same socket, no gap
             const json = JSON.stringify(state);
             await client.set(REDIS_KEY, json);
-            console.log(`[SOVEREIGN POST] ${action} OK — ${json.length}b — gold=${state.gold} inv=${state.inventory.length} items`);
+            console.log(`[SOVEREIGN POST] ${action} OK — ${json.length}b — gold=${state.gold} inv=${state.inventory.length} alerts=${state.alerts.length} quests=${state.quests.length}`);
 
             return state;
         });

@@ -7,7 +7,9 @@
       "Bash(echo \"EXIT:$?\")",
       "Skill(update-config)",
       "Bash(claude:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(grep:*)",
+      "mcp__qmd__query"
     ]
   }
 }
