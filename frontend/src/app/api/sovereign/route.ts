@@ -25,6 +25,28 @@ export interface SovereignQuest {
     expReward: number; goldReward: number; status: 'active';
 }
 
+export interface DailyQuestState {
+    pushups:   number;
+    situps:    number;
+    squats:    number;
+    run:       number;
+    completed: boolean;
+    lastReset: number;
+}
+
+export interface DungeonTask {
+    id:          string;
+    text:        string;
+    isCompleted: boolean;
+}
+
+export interface ActiveDungeon {
+    id:           string;
+    milestoneName: string;
+    tasks:         DungeonTask[];
+    progress:      number;
+}
+
 export interface SovereignState {
     level:           number;
     exp:             number;
@@ -45,15 +67,22 @@ export interface SovereignState {
     quests:          SovereignQuest[];
     clearedDungeons: string[];
     skills:          string[];
+    activeDungeon:   ActiveDungeon | null;
+    dailyQuest:      DailyQuestState;
+    penaltyActive:   boolean;
 }
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
+
+const DEFAULT_DAILY_QUEST: DailyQuestState = {
+    pushups: 0, situps: 0, squats: 0, run: 0, completed: false, lastReset: 0,
+};
 
 const DEFAULT_STATE: SovereignState = {
     level:           17,
     exp:             4200,
     maxExp:          7009,
-    title:           "Wolf Slayer",
+    title:           "The Weakest Hunter of All Mankind",
     hp:              900,
     maxHp:           900,
     fatigue:         12,
@@ -69,6 +98,9 @@ const DEFAULT_STATE: SovereignState = {
     quests:          [],
     clearedDungeons: [],
     skills:          [],
+    activeDungeon:   null,
+    dailyQuest:      { ...DEFAULT_DAILY_QUEST },
+    penaltyActive:   false,
 };
 
 const REDIS_KEY   = "sovereign_state";
@@ -134,6 +166,9 @@ function parseState(raw: string | null): SovereignState {
             quests:          Array.isArray(p.quests)          ? p.quests          : [],
             clearedDungeons: Array.isArray(p.clearedDungeons) ? p.clearedDungeons : [],
             skills:          Array.isArray(p.skills)          ? p.skills          : [],
+            activeDungeon:   p.activeDungeon ?? null,
+            dailyQuest:      p.dailyQuest ? { ...DEFAULT_DAILY_QUEST, ...p.dailyQuest } : { ...DEFAULT_DAILY_QUEST },
+            penaltyActive:   p.penaltyActive ?? false,
         };
     } catch {
         return { ...DEFAULT_STATE };
@@ -177,6 +212,48 @@ function allocateStat(state: SovereignState, stat: StatKey): SovereignState {
     };
     if (stat === "vit") { next.maxHp += 10; next.hp += 10; }
     return next;
+}
+
+// ── Dungeon clear rewards ────────────────────────────────────────────────────
+// Shared by clearDungeon action and auto-clear on completeDungeonTask.
+
+function awardDungeonClear(state: SovereignState, dungeonId: string): SovereignState {
+    if (dungeonId === "double_dungeon") {
+        // Awakening — Sovereign becomes "Player"
+        return processLevelUp({
+            ...state,
+            title:           "Player",
+            clearedDungeons: [...state.clearedDungeons, dungeonId],
+        });
+    } else if (dungeonId === "hapjeong_subway") {
+        const venomFang: InventoryItem = {
+            id:          "kasaka_venom_fang",
+            name:        "Kasaka's Venom Fang",
+            type:        "gear",
+            description: "A deadly fang harvested from the Blue Venom-Fang Kasaka. Radiates dark energy.",
+            effect:      { str: 15 },
+            quantity:    1,
+            equipped:    false,
+        };
+        return processLevelUp({
+            ...state,
+            exp:             state.exp + 3000,
+            inventory:       [...state.inventory, venomFang],
+            clearedDungeons: [...state.clearedDungeons, dungeonId],
+        });
+    } else if (dungeonId === "dungeon_prisoners") {
+        return processLevelUp({
+            ...state,
+            exp:             state.exp + 5000,
+            skills:          [...state.skills, "Stealth", "Bloodlust"],
+            clearedDungeons: [...state.clearedDungeons, dungeonId],
+        });
+    } else {
+        return processLevelUp({
+            ...state,
+            clearedDungeons: [...state.clearedDungeons, dungeonId],
+        });
+    }
 }
 
 // ── GET — single connection: read → respond ─────────────────────────────────
@@ -352,36 +429,113 @@ export async function POST(req: NextRequest) {
                 if (!dungeonId) throw { userError: true, msg: "clearDungeon requires: dungeonId", status: 422 };
                 if (state.clearedDungeons.includes(dungeonId))
                     throw { userError: true, msg: "Dungeon already cleared", status: 422 };
+                state = awardDungeonClear(state, dungeonId);
 
-                if (dungeonId === "hapjeong_subway") {
-                    const venomFang: InventoryItem = {
-                        id:          "kasaka_venom_fang",
-                        name:        "Kasaka's Venom Fang",
-                        type:        "gear",
-                        description: "A deadly fang harvested from the Blue Venom-Fang Kasaka. Radiates dark energy.",
-                        effect:      { str: 15 },
+            } else if (action === "startDungeon") {
+                const { dungeonId, milestoneName, tasks } = body as any;
+                if (!dungeonId || !milestoneName || !Array.isArray(tasks) || tasks.length === 0)
+                    throw { userError: true, msg: "startDungeon requires: dungeonId, milestoneName, tasks (non-empty array)", status: 422 };
+                if (state.clearedDungeons.includes(String(dungeonId)))
+                    throw { userError: true, msg: "Dungeon already cleared", status: 422 };
+                const normalizedTasks: DungeonTask[] = (tasks as any[]).map((t, i) => ({
+                    id:          String(t.id ?? `task-${i}`),
+                    text:        String(t.text ?? t.description ?? ""),
+                    isCompleted: false,
+                }));
+                state = {
+                    ...state,
+                    activeDungeon: {
+                        id:           String(dungeonId),
+                        milestoneName: String(milestoneName),
+                        tasks:         normalizedTasks,
+                        progress:      0,
+                    },
+                };
+
+            } else if (action === "completeDungeonTask") {
+                const { taskId } = body as { taskId?: string };
+                if (!taskId) throw { userError: true, msg: "completeDungeonTask requires: taskId", status: 422 };
+                if (!state.activeDungeon) throw { userError: true, msg: "No active dungeon", status: 422 };
+
+                const dungeonId    = state.activeDungeon.id;
+                const updatedTasks = state.activeDungeon.tasks.map(t =>
+                    t.id === taskId ? { ...t, isCompleted: true } : t
+                );
+                const completedCount = updatedTasks.filter(t => t.isCompleted).length;
+                const progress       = Math.round((completedCount / updatedTasks.length) * 100);
+
+                state = {
+                    ...state,
+                    activeDungeon: { ...state.activeDungeon, tasks: updatedTasks, progress },
+                };
+
+                // Auto-clear on 100%: grant rewards and null out activeDungeon
+                if (progress >= 100) {
+                    if (!state.clearedDungeons.includes(dungeonId)) {
+                        state = awardDungeonClear({ ...state, activeDungeon: null }, dungeonId);
+                    } else {
+                        state = { ...state, activeDungeon: null };
+                    }
+                }
+
+            } else if (action === "updateDailyQuest") {
+                const { type, amount } = body as { type?: string; amount?: number };
+                const QUEST_METRICS = ["pushups", "situps", "squats", "run"] as const;
+                if (!type || !(QUEST_METRICS as readonly string[]).includes(type))
+                    throw { userError: true, msg: "updateDailyQuest requires: type (pushups|situps|squats|run)", status: 422 };
+                if (typeof amount !== "number" || amount <= 0)
+                    throw { userError: true, msg: "updateDailyQuest requires: amount (positive number)", status: 422 };
+
+                const dq = { ...state.dailyQuest };
+                (dq as Record<string, unknown>)[type] = (dq[type as keyof typeof dq] as number) + amount;
+
+                const isNowComplete = !dq.completed
+                    && dq.pushups >= 100 && dq.situps >= 100
+                    && dq.squats  >= 100 && dq.run    >= 10;
+
+                if (isNowComplete) {
+                    dq.completed = true;
+                    const lootBox: InventoryItem = {
+                        id:          `loot-box-${Date.now()}`,
+                        name:        "Random Loot Box",
+                        type:        "consumable",
+                        description: "A mysterious box containing random rewards from the System.",
+                        effect:      { exp: 500 },
                         quantity:    1,
                         equipped:    false,
                     };
-                    state = processLevelUp({
+                    const completionAlert: SovereignAlert = {
+                        id:        `daily-complete-${Date.now()}`,
+                        message:   "[SYSTEM] Daily Quest Complete! The System rewards the diligent.",
+                        type:      "success",
+                        timestamp: Date.now(),
+                    };
+                    state = {
                         ...state,
-                        exp:             state.exp + 3000,
-                        inventory:       [...state.inventory, venomFang],
-                        clearedDungeons: [...state.clearedDungeons, dungeonId],
-                    });
-                } else if (dungeonId === "dungeon_prisoners") {
-                    state = processLevelUp({
-                        ...state,
-                        exp:             state.exp + 5000,
-                        skills:          [...state.skills, "Stealth", "Bloodlust"],
-                        clearedDungeons: [...state.clearedDungeons, dungeonId],
-                    });
+                        dailyQuest:      dq,
+                        availablePoints: state.availablePoints + 3,
+                        hp:              state.maxHp,
+                        inventory:       [...state.inventory, lootBox],
+                        alerts:          [...state.alerts, completionAlert].slice(-5),
+                    };
                 } else {
-                    state = processLevelUp({
-                        ...state,
-                        clearedDungeons: [...state.clearedDungeons, dungeonId],
-                    });
+                    state = { ...state, dailyQuest: dq };
                 }
+
+            } else if (action === "triggerPenalty") {
+                state = { ...state, penaltyActive: true };
+
+            } else if (action === "devSetLevel") {
+                const { newLevel } = body as { newLevel?: number };
+                if (typeof newLevel !== "number" || newLevel < 1 || newLevel > 200)
+                    throw { userError: true, msg: "devSetLevel requires: newLevel (1–200)", status: 422 };
+                state = {
+                    ...state,
+                    level:           newLevel,
+                    exp:             0,
+                    title:           resolveTitle(newLevel, state.title),
+                    availablePoints: state.availablePoints + 50,
+                };
 
             } else {
                 throw { userError: true, msg: "Unknown action", status: 422 };

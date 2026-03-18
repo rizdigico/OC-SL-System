@@ -63,29 +63,16 @@ const RANK_COLOR: Record<string, string> = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MainStoryline() {
-    const { sovereign, updateSovereign } = useSovereign();
-    const [loading, setLoading] = useState<string | null>(null);
+    const { sovereign } = useSovereign();
+    const [awaitingAssessment, setAwaitingAssessment] = useState<string | null>(null);
 
     const clearedDungeons = sovereign?.clearedDungeons ?? [];
+    const activeDungeon   = sovereign?.activeDungeon ?? null;
     const level           = sovereign?.level ?? 1;
 
     // The first dungeon not yet cleared is the "active" candidate
-    const nextIdx = PHASE_I_DUNGEONS.findIndex(d => !clearedDungeons.includes(d.id));
+    const nextIdx    = PHASE_I_DUNGEONS.findIndex(d => !clearedDungeons.includes(d.id));
     const allCleared = nextIdx === -1;
-
-    const handleEnterDungeon = async (dungeonId: string) => {
-        setLoading(dungeonId);
-        try {
-            const res = await fetch("/api/sovereign", {
-                method:  "POST",
-                headers: { "Content-Type": "application/json" },
-                body:    JSON.stringify({ action: "clearDungeon", dungeonId }),
-            });
-            if (res.ok) updateSovereign(await res.json());
-        } finally {
-            setLoading(null);
-        }
-    };
 
     return (
         <div className="sl-panel">
@@ -106,7 +93,6 @@ export function MainStoryline() {
                     const isNext    = idx === nextIdx;
                     const isActive  = isNext && level >= dungeon.reqLevel;
                     const rankColor = RANK_COLOR[dungeon.rank] ?? "#7a9abf";
-                    const isLoading = loading === dungeon.id;
 
                     return (
                         <motion.div
@@ -160,22 +146,31 @@ export function MainStoryline() {
                             {/* State indicator */}
                             {isCleared ? (
                                 <CheckCircle2 className="w-5 h-5 text-[#11D2EF]/40 flex-shrink-0" />
+                            ) : activeDungeon?.id === dungeon.id ? (
+                                /* This dungeon is currently active — show progress */
+                                <div className="flex-shrink-0 flex items-center gap-1.5 text-[10px] font-bold text-red-400">
+                                    <Skull className="w-3.5 h-3.5 animate-pulse" />
+                                    <span>{activeDungeon.progress}% done</span>
+                                </div>
                             ) : isActive ? (
-                                <button
-                                    onClick={() => handleEnterDungeon(dungeon.id)}
-                                    disabled={isLoading}
-                                    className="sl-btn sl-btn-red flex-shrink-0 text-xs px-3 py-1.5 flex items-center gap-1.5"
-                                    style={{ minWidth: "7.5rem" }}
-                                >
-                                    {isLoading ? (
-                                        <span className="animate-pulse tracking-widest">ENTERING...</span>
-                                    ) : (
-                                        <>
-                                            <Skull className="w-3.5 h-3.5" />
-                                            ENTER DUNGEON
-                                        </>
-                                    )}
-                                </button>
+                                /* Awaiting OpenClaw AI to generate tasks */
+                                awaitingAssessment === dungeon.id ? (
+                                    <div
+                                        className="flex-shrink-0 text-[9px] font-black tracking-wide text-right leading-tight"
+                                        style={{ maxWidth: "9rem", color: "#f59e0b" }}
+                                    >
+                                        Awaiting Architect Assessment to generate milestone tasks.
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setAwaitingAssessment(dungeon.id)}
+                                        className="sl-btn sl-btn-red flex-shrink-0 text-xs px-3 py-1.5 flex items-center gap-1.5"
+                                        style={{ minWidth: "7.5rem" }}
+                                    >
+                                        <Skull className="w-3.5 h-3.5" />
+                                        ENTER DUNGEON
+                                    </button>
+                                )
                             ) : isNext && level < dungeon.reqLevel ? (
                                 <div className="flex-shrink-0 flex items-center gap-1 text-[10px] text-gray-600 font-bold">
                                     <Lock className="w-3.5 h-3.5" />

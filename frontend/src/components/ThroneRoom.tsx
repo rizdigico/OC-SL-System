@@ -9,7 +9,9 @@ import { ShadowBarracks } from "@/components/army/ShadowBarracks";
 import { DEFAULT_OWNED_SHADOWS } from "@/lib/ShadowData";
 import { SystemConfig } from "@/components/SystemConfig";
 import { GuildMetrics } from "@/components/dashboard/GuildMetrics";
+import { DailyQuest }  from "@/components/DailyQuest";
 import { useAgentState } from "@/hooks/useAgentState";
+import { useSovereign } from "@/context/SovereignContext";
 
 // ── Dummy Data ────────────────────────────────────────────────────────────────
 
@@ -174,6 +176,138 @@ function AgentCard({ agent }: { agent: DummyAgent }) {
     );
 }
 
+// ── Active Dungeon Panel ──────────────────────────────────────────────────────
+
+const DUNGEON_BOSS_MAP: Record<string, string> = {
+    double_dungeon:    "Statue of God",
+    hapjeong_subway:   "Blue Venom-Fang Kasaka",
+    dungeon_lizards:   "Giant Arachnid Buryura",
+    dungeon_prisoners: "Kang Taeshik",
+};
+
+interface ActiveDungeonData {
+    id:            string;
+    milestoneName: string;
+    tasks:         { id: string; text: string; isCompleted: boolean }[];
+    progress:      number;
+}
+
+function ActiveDungeonPanel({
+    activeDungeon,
+    onTaskComplete,
+}: {
+    activeDungeon: ActiveDungeonData;
+    onTaskComplete: (taskId: string) => Promise<void>;
+}) {
+    const [completing, setCompleting] = useState<string | null>(null);
+    const bossName = DUNGEON_BOSS_MAP[activeDungeon.id] ?? activeDungeon.id.replace(/_/g, " ").toUpperCase();
+    const bossHp   = Math.max(0, 100 - activeDungeon.progress);
+
+    const handleComplete = async (taskId: string) => {
+        setCompleting(taskId);
+        try { await onTaskComplete(taskId); }
+        finally { setCompleting(null); }
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative rounded-xl overflow-hidden border mb-4"
+            style={{
+                background:  "rgba(9,11,17,0.9)",
+                borderColor: "rgba(239,68,68,0.4)",
+                boxShadow:   "0 0 30px rgba(239,68,68,0.1), inset 0 1px 0 rgba(239,68,68,0.15)",
+            }}
+        >
+            {/* Top glow line */}
+            <div className="absolute top-0 left-0 right-0 h-px"
+                 style={{ background: "linear-gradient(90deg, transparent, rgba(239,68,68,0.6), transparent)" }} />
+
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 py-2.5 border-b"
+                 style={{ borderColor: "rgba(239,68,68,0.2)" }}>
+                <motion.span
+                    animate={{ opacity: [1, 0.3, 1] }}
+                    transition={{ duration: 0.9, repeat: Infinity }}
+                    className="text-[9px] text-red-500"
+                >⚠</motion.span>
+                <span className="text-[10px] font-black tracking-[0.3em] uppercase text-red-400">
+                    Active Raid
+                </span>
+                <span className="ml-auto text-[9px] text-zinc-500 font-mono">
+                    BOSS HP: {bossHp}%
+                </span>
+            </div>
+
+            {/* Boss HP bar */}
+            <div className="h-1.5 bg-zinc-900">
+                <motion.div
+                    className="h-full"
+                    animate={{ width: `${bossHp}%` }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    style={{ background: "linear-gradient(90deg, #7f1d1d, #ef4444)", boxShadow: "0 0 6px #ef4444" }}
+                />
+            </div>
+
+            <div className="p-4 space-y-3">
+                {/* Boss info */}
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <p className="text-[9px] text-zinc-600 font-black tracking-widest uppercase mb-0.5">BOSS</p>
+                        <p className="text-sm font-black text-red-400 tracking-wide uppercase">{bossName}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[9px] text-zinc-600 font-black tracking-widest uppercase mb-0.5">MILESTONE</p>
+                        <p className="text-xs font-bold text-white">{activeDungeon.milestoneName}</p>
+                    </div>
+                </div>
+
+                {/* Task checklist */}
+                <div className="space-y-1.5">
+                    <p className="text-[9px] font-black tracking-[0.3em] text-zinc-500 uppercase">
+                        Mission Tasks ({activeDungeon.tasks.filter(t => t.isCompleted).length}/{activeDungeon.tasks.length})
+                    </p>
+                    {activeDungeon.tasks.map(task => (
+                        <motion.div
+                            key={task.id}
+                            layout
+                            className="flex items-center gap-2.5 rounded-lg px-3 py-2 border"
+                            style={{
+                                background:  task.isCompleted ? "rgba(34,197,94,0.05)"  : "rgba(255,255,255,0.02)",
+                                borderColor: task.isCompleted ? "rgba(34,197,94,0.2)"   : "rgba(255,255,255,0.06)",
+                            }}
+                        >
+                            <button
+                                disabled={task.isCompleted || completing === task.id}
+                                onClick={() => !task.isCompleted && handleComplete(task.id)}
+                                className="w-4 h-4 flex-shrink-0 rounded border flex items-center justify-center transition-all"
+                                style={{
+                                    borderColor: task.isCompleted ? "#22c55e" : "rgba(239,68,68,0.4)",
+                                    background:  task.isCompleted ? "#22c55e" : "transparent",
+                                    cursor:      task.isCompleted ? "default" : "pointer",
+                                }}
+                            >
+                                {task.isCompleted && (
+                                    <svg className="w-2.5 h-2.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                )}
+                                {completing === task.id && !task.isCompleted && (
+                                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                                )}
+                            </button>
+                            <span className={`text-[11px] font-medium flex-1 ${task.isCompleted ? "line-through text-zinc-600" : "text-zinc-300"}`}>
+                                {task.text}
+                            </span>
+                        </motion.div>
+                    ))}
+                </div>
+            </div>
+        </motion.div>
+    );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
@@ -187,6 +321,7 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
     const [isConfigOpen,     setIsConfigOpen]     = useState(false);
 
     const { agents, hasLiveData, maxProgress } = useAgentState();
+    const { sovereign, updateSovereign }       = useSovereign();
 
     const STATUS_MAP: Record<string, DummyAgent["status"]> = {
         EXECUTING: "Executing",
@@ -231,8 +366,13 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
     // Live agents drive the battler; dev slider is fallback when nothing is executing
     const effectiveProgress = hasLiveData ? (maxProgress ?? 0) : mockTaskProgress;
 
-    const systemAccent = isPenaltyZone ? "#ef4444" : "#3b82f6";
-    const userLevel = user?.stats?.level ?? 17;
+    const systemAccent        = isPenaltyZone ? "#ef4444" : "#3b82f6";
+    const userLevel           = user?.stats?.level ?? 17;
+    const sovereignLevel      = sovereign?.level ?? userLevel;
+    const isLevelForShadows   = sovereignLevel >= 40;
+    const shadowAccent        = isLevelForShadows ? "#a855f7" : "#3b82f6";
+    const shadowPanelTitle    = isLevelForShadows ? "Shadow Army"   : "Active Processes";
+    const shadowPanelSubtitle = "LIVE TRACKING";
 
     // ── System Initialized audio cue ──────────────────────────────────────────
     useEffect(() => {
@@ -304,11 +444,27 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
                 )}
             </AnimatePresence>
 
+            {/* ── Active Dungeon Panel ─────────────────────────────────── */}
+            {sovereign?.activeDungeon && (
+                <ActiveDungeonPanel
+                    activeDungeon={sovereign.activeDungeon}
+                    onTaskComplete={async (taskId) => {
+                        const res = await fetch("/api/sovereign", {
+                            method:  "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body:    JSON.stringify({ action: "completeDungeonTask", taskId }),
+                        });
+                        if (res.ok) updateSovereign(await res.json());
+                    }}
+                />
+            )}
+
             {/* ── Auto-Battler + dev slider ────────────────────────────── */}
             <div className="relative mb-4 space-y-2">
                 <AutoBattler
                     progress={effectiveProgress}
                     arcData={getCurrentArc(userLevel)}
+                    showShadows={isLevelForShadows}
                 />
                 {/* Dev slider — visible only in development */}
                 {process.env.NODE_ENV === "development" && (
@@ -368,8 +524,9 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
                             accentColor={systemAccent}
                             icon={<Swords className="w-3.5 h-3.5" />}
                         />
-                        <div className="p-4">
+                        <div className="p-4 space-y-4">
                             <GuildMetrics isPenaltyZone={isPenaltyZone} liveAgents={agents} />
+                            <DailyQuest />
                         </div>
                     </GlassPanel>
                 </motion.div>
@@ -382,21 +539,23 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
                     animate={{ opacity: 1, x:  0 }}
                     transition={{ duration: 0.5, delay: 0.2 }}
                 >
-                    <GlassPanel accentColor="#a855f7" className="h-fit">
+                    <GlassPanel accentColor={shadowAccent} className="h-fit">
                         <PanelHeader
-                            title="Shadow Army"
-                            accentColor="#a855f7"
+                            title={shadowPanelTitle}
+                            accentColor={shadowAccent}
                             icon={<Cpu className="w-3.5 h-3.5" />}
                         />
 
                         {/* Live badge */}
                         <div
                             className="flex items-center gap-2 px-4 py-2 border-b"
-                            style={{ borderColor: "rgba(168,85,247,0.15)" }}
+                            style={{ borderColor: `${shadowAccent}25` }}
                         >
-                            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasLiveData ? "bg-green-400" : "bg-purple-500"}`} />
-                            <span className={`text-[9px] font-black tracking-[0.3em] ${hasLiveData ? "text-green-400" : "text-purple-500"}`}>
-                                {hasLiveData ? "LIVE SIGNAL" : "LIVE TRACKING"}
+                            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasLiveData ? "bg-green-400" : ""}`}
+                                  style={!hasLiveData ? { background: shadowAccent } : {}} />
+                            <span className={`text-[9px] font-black tracking-[0.3em] ${hasLiveData ? "text-green-400" : ""}`}
+                                  style={!hasLiveData ? { color: shadowAccent } : {}}>
+                                {hasLiveData ? "LIVE SIGNAL" : shadowPanelSubtitle}
                             </span>
                             <span className="ml-auto text-[9px] text-zinc-600">
                                 {allAgents.filter(a => a.status !== "Offline").length} online
@@ -405,8 +564,8 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
 
                         {/* Fleet summary */}
                         <div
-                            className="grid grid-cols-3 divide-x divide-purple-900/30 px-1 py-2 border-b"
-                            style={{ borderColor: "rgba(168,85,247,0.12)" }}
+                            className="grid grid-cols-3 divide-x px-1 py-2 border-b"
+                            style={{ borderColor: `${shadowAccent}12` }}
                         >
                             {[
                                 { label: "Active",    val: allAgents.filter(a => a.status === "Executing").length, color: "#3b82f6" },
@@ -434,33 +593,53 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
                                 ))}
                             </AnimatePresence>
 
-                            {/* ENTER SHADOW ARMY */}
+                            {/* ENTER SHADOW ARMY — locked until Level 40 */}
                             <div className="relative group mt-2">
-                                <motion.button
-                                    whileHover={!isPenaltyZone ? { scale: 1.02 } : {}}
-                                    whileTap={!isPenaltyZone ? { scale: 0.98 } : {}}
-                                    onClick={() => !isPenaltyZone && setIsBarracksOpen(true)}
-                                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border font-black text-[10px] tracking-[0.3em] uppercase transition-all duration-200"
-                                    style={isPenaltyZone ? {
-                                        color:       "#52525b",
-                                        borderColor: "rgba(255,255,255,0.08)",
-                                        background:  "transparent",
-                                        cursor:      "not-allowed",
-                                        opacity:     0.5,
-                                    } : {
-                                        color:       "#b200ff",
-                                        borderColor: "rgba(178,0,255,0.45)",
-                                        background:  "rgba(178,0,255,0.07)",
-                                        boxShadow:   "0 0 16px rgba(178,0,255,0.12), inset 0 0 16px rgba(178,0,255,0.05)",
-                                        textShadow:  "0 0 10px rgba(178,0,255,0.6)",
-                                    }}
-                                >
-                                    <Swords className="w-3.5 h-3.5" style={isPenaltyZone ? {} : { filter: "drop-shadow(0 0 4px rgba(178,0,255,0.8))" }} />
-                                    Enter Shadow Army
-                                </motion.button>
-                                {isPenaltyZone && (
+                                {isLevelForShadows ? (
+                                    <motion.button
+                                        whileHover={!isPenaltyZone ? { scale: 1.02 } : {}}
+                                        whileTap={!isPenaltyZone ? { scale: 0.98 } : {}}
+                                        onClick={() => !isPenaltyZone && setIsBarracksOpen(true)}
+                                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border font-black text-[10px] tracking-[0.3em] uppercase transition-all duration-200"
+                                        style={isPenaltyZone ? {
+                                            color:       "#52525b",
+                                            borderColor: "rgba(255,255,255,0.08)",
+                                            background:  "transparent",
+                                            cursor:      "not-allowed",
+                                            opacity:     0.5,
+                                        } : {
+                                            color:       "#b200ff",
+                                            borderColor: "rgba(178,0,255,0.45)",
+                                            background:  "rgba(178,0,255,0.07)",
+                                            boxShadow:   "0 0 16px rgba(178,0,255,0.12), inset 0 0 16px rgba(178,0,255,0.05)",
+                                            textShadow:  "0 0 10px rgba(178,0,255,0.6)",
+                                        }}
+                                    >
+                                        <Swords className="w-3.5 h-3.5" style={{ filter: "drop-shadow(0 0 4px rgba(178,0,255,0.8))" }} />
+                                        Enter Shadow Army
+                                    </motion.button>
+                                ) : (
+                                    <div
+                                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border font-black text-[10px] tracking-[0.3em] uppercase"
+                                        style={{
+                                            color:       "#374151",
+                                            borderColor: "rgba(255,255,255,0.06)",
+                                            background:  "transparent",
+                                            cursor:      "not-allowed",
+                                        }}
+                                    >
+                                        <Swords className="w-3.5 h-3.5" />
+                                        Shadow Army — Lv. 40
+                                    </div>
+                                )}
+                                {isPenaltyZone && isLevelForShadows && (
                                     <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:flex items-center whitespace-nowrap px-2 py-1 rounded bg-zinc-900 border border-red-500/30 text-[9px] font-bold text-red-400 tracking-wider pointer-events-none z-10">
                                         🔒 LOCKED — Clear Penalty Zone first
+                                    </div>
+                                )}
+                                {!isLevelForShadows && (
+                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:flex items-center whitespace-nowrap px-2 py-1 rounded bg-zinc-900 border border-zinc-700/50 text-[9px] font-bold text-zinc-500 tracking-wider pointer-events-none z-10">
+                                        Unlocks at Level 40
                                     </div>
                                 )}
                             </div>
@@ -482,9 +661,10 @@ export function ThroneRoom({ user, isPenaltyZone = false, onClearPenalty }: {
                             {/* Webhook reference */}
                             <div
                                 className="rounded-lg p-3 border"
-                                style={{ background: "rgba(168,85,247,0.04)", borderColor: "rgba(168,85,247,0.15)" }}
+                                style={{ background: `${shadowAccent}08`, borderColor: `${shadowAccent}25` }}
                             >
-                                <p className="text-[9px] font-black tracking-[0.2em] text-purple-500/60 uppercase mb-1.5">
+                                <p className="text-[9px] font-black tracking-[0.2em] uppercase mb-1.5"
+                                   style={{ color: `${shadowAccent}99` }}>
                                     Bind Real Agent
                                 </p>
                                 <p className="text-[9px] text-zinc-700 font-mono leading-relaxed break-all">

@@ -112,11 +112,13 @@ async function redisGetAll(): Promise<AgentStateMap> {
 const SOVEREIGN_KEY = "sovereign_state";
 
 const SOVEREIGN_DEFAULTS: SovereignState = {
-    level: 17, exp: 4200, maxExp: 7009, title: "Wolf Slayer",
+    level: 17, exp: 4200, maxExp: 7009, title: "The Weakest Hunter of All Mankind",
     hp: 900, maxHp: 900, fatigue: 12,
     str: 40, agi: 35, vit: 40, int: 60, per: 30, availablePoints: 5,
     gold: 5000, inventory: [], alerts: [], quests: [],
-    clearedDungeons: [], skills: [],
+    clearedDungeons: [], skills: [], activeDungeon: null,
+    dailyQuest:    { pushups: 0, situps: 0, squats: 0, run: 0, completed: false, lastReset: 0 },
+    penaltyActive: false,
 };
 
 function parseSovereignState(raw: string | null): SovereignState {
@@ -130,6 +132,11 @@ function parseSovereignState(raw: string | null): SovereignState {
             inventory:       Array.isArray(p.inventory)       ? p.inventory       : [],
             clearedDungeons: Array.isArray(p.clearedDungeons) ? p.clearedDungeons : [],
             skills:          Array.isArray(p.skills)          ? p.skills          : [],
+            activeDungeon:   p.activeDungeon ?? null,
+            dailyQuest:      p.dailyQuest
+                ? { ...{ pushups: 0, situps: 0, squats: 0, run: 0, completed: false, lastReset: 0 }, ...p.dailyQuest }
+                : { pushups: 0, situps: 0, squats: 0, run: 0, completed: false, lastReset: 0 },
+            penaltyActive:   p.penaltyActive ?? false,
         };
     } catch {
         return { ...SOVEREIGN_DEFAULTS };

@@ -10,8 +10,10 @@ import { ShadowExtraction } from "@/components/dungeon/ShadowExtraction";
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface AutoBattlerProps {
-    progress: number;
-    arcData:  StoryArc;
+    progress:     number;
+    arcData:      StoryArc;
+    /** Show shadow army sprites (IGRIS, BERU) and Shadow Extraction. Gated at Level 40. */
+    showShadows?: boolean;
 }
 
 type Phase = "normal" | "boss" | "cleared";
@@ -275,7 +277,7 @@ function Sparks({ color, active }: { color: string; active: boolean }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export function AutoBattler({ progress, arcData }: AutoBattlerProps) {
+export function AutoBattler({ progress, arcData, showShadows = true }: AutoBattlerProps) {
     const phase: Phase     = progress >= 100 ? "cleared" : progress >= 80 ? "boss" : "normal";
     const isBoss           = phase === "boss";
     const isCleared        = phase === "cleared";
@@ -445,17 +447,34 @@ export function AutoBattler({ progress, arcData }: AutoBattlerProps) {
                     )}
                 </AnimatePresence>
 
-                {/* ── MID ROW: IGRIS + BERU ────────────────────────────────── */}
+                {/* ── MID ROW: IGRIS + BERU (Shadow Army — Level 40 gate) ─── */}
                 {[
                     { variant: "igris" as const, name: "IGRIS", color: "#60a5fa", src: SPRITES.HIGH_TIER.igris.src, left: "19%", bottom: 44 },
                     { variant: "beru"  as const, name: "BERU",  color: "#22c55e", src: SPRITES.HIGH_TIER.beru.src,  left: "27%", bottom: 26 },
                 ].map((a, i) => (
                     <div key={a.name} className="absolute flex flex-col items-center" style={{ left: a.left, bottom: a.bottom }}>
-                        <Idle speed={1.4 + i * 0.3} amount={2.5} delay={i * 0.4} enabled={!isCleared}>
-                            <PixelSprite variant={a.variant} w={28} h={44} src={a.src} />
-                        </Idle>
-                        <Tag name={a.name} color={a.color} xs />
-                        <HPBar pct={100} color={a.color} width={28} />
+                        {showShadows ? (
+                            <>
+                                <Idle speed={1.4 + i * 0.3} amount={2.5} delay={i * 0.4} enabled={!isCleared}>
+                                    <PixelSprite variant={a.variant} w={28} h={44} src={a.src} />
+                                </Idle>
+                                <Tag name={a.name} color={a.color} xs />
+                                <HPBar pct={100} color={a.color} width={28} />
+                            </>
+                        ) : (
+                            /* Wireframe node — pre-Level 40 placeholder */
+                            <div
+                                className="flex flex-col items-center gap-0.5"
+                                style={{ opacity: 0.25 }}
+                            >
+                                <div style={{
+                                    width: 28, height: 44,
+                                    border: "1px solid #334155",
+                                    background: "rgba(30,41,59,0.3)",
+                                }} />
+                                <span className="text-[6px] font-black tracking-widest text-zinc-700 uppercase">NODE</span>
+                            </div>
+                        )}
                     </div>
                 ))}
 
@@ -625,25 +644,42 @@ export function AutoBattler({ progress, arcData }: AutoBattlerProps) {
                                 </p>
                             </motion.div>
 
-                            <motion.button
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.45 }}
-                                whileHover={{ scale: 1.04 }}
-                                whileTap={{ scale: 0.97 }}
-                                onClick={() => setShowExtraction(true)}
-                                className="flex items-center gap-2 px-5 py-2 rounded-xl border font-black text-[9px] tracking-[0.3em] uppercase"
-                                style={{
-                                    color:       "#b200ff",
-                                    borderColor: "rgba(178,0,255,0.5)",
-                                    background:  "rgba(178,0,255,0.07)",
-                                    boxShadow:   "0 0 20px rgba(178,0,255,0.2)",
-                                    textShadow:  "0 0 10px rgba(178,0,255,0.6)",
-                                }}
-                            >
-                                <Zap className="w-3 h-3" style={{ filter: "drop-shadow(0 0 4px rgba(178,0,255,0.9))" }} />
-                                Shadow Extraction
-                            </motion.button>
+                            {showShadows ? (
+                                <motion.button
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.45 }}
+                                    whileHover={{ scale: 1.04 }}
+                                    whileTap={{ scale: 0.97 }}
+                                    onClick={() => setShowExtraction(true)}
+                                    className="flex items-center gap-2 px-5 py-2 rounded-xl border font-black text-[9px] tracking-[0.3em] uppercase"
+                                    style={{
+                                        color:       "#b200ff",
+                                        borderColor: "rgba(178,0,255,0.5)",
+                                        background:  "rgba(178,0,255,0.07)",
+                                        boxShadow:   "0 0 20px rgba(178,0,255,0.2)",
+                                        textShadow:  "0 0 10px rgba(178,0,255,0.6)",
+                                    }}
+                                >
+                                    <Zap className="w-3 h-3" style={{ filter: "drop-shadow(0 0 4px rgba(178,0,255,0.9))" }} />
+                                    Shadow Extraction
+                                </motion.button>
+                            ) : (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.45 }}
+                                    className="flex items-center gap-2 px-5 py-2 rounded-xl border text-[9px] font-black tracking-[0.3em] uppercase"
+                                    style={{
+                                        color:       "#374151",
+                                        borderColor: "rgba(255,255,255,0.08)",
+                                        background:  "transparent",
+                                    }}
+                                >
+                                    <Zap className="w-3 h-3" />
+                                    Shadow Extraction — Lv. 40
+                                </motion.div>
+                            )}
                         </motion.div>
                     )}
                 </AnimatePresence>

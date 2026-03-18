@@ -5,7 +5,6 @@ import { SovereignProvider, useSovereign } from "@/context/SovereignContext";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Brain, Eye, Activity, Shield, Sparkles, ShoppingCart, Package, Sword, Settings, Zap, Skull, Terminal, BookOpen } from "lucide-react";
-import { getCurrentArc } from "@/lib/StorylineEngine";
 import { MobList } from "@/components/dungeon/MobComponents";
 import { StatusWindow } from "@/components/StatusWindow";
 import { SystemShop } from "@/components/economy/SystemShop";
@@ -590,9 +589,18 @@ function DashboardContent() {
                                     SKILL MATRIX
                                 </button>
 
-                                {/* Storyline Arc */}
+                                {/* Storyline Arc — dynamic, driven by clearedDungeons */}
                                 {(() => {
-                                    const arc = getCurrentArc(user.stats.level ?? 1);
+                                    const cleared = sovereign?.clearedDungeons ?? [];
+                                    const currentStoryline = !cleared.includes("double_dungeon")
+                                        ? { arc: "D-Rank Double Dungeon",  boss: "Statue of God"          }
+                                        : !cleared.includes("hapjeong_subway")
+                                        ? { arc: "E-Rank Instant Dungeon", boss: "Blue Venom-Fang Kasaka" }
+                                        : !cleared.includes("dungeon_lizards")
+                                        ? { arc: "C-Rank Strike Squad",    boss: "Giant Arachnid Buryura" }
+                                        : !cleared.includes("dungeon_prisoners")
+                                        ? { arc: "B-Rank Assassin",        boss: "Kang Taeshik"           }
+                                        : { arc: "Phase II Pending",       boss: "Unknown"                };
                                     return (
                                         <div
                                             className="rounded-lg px-3 py-2.5 border space-y-1.5 mt-1"
@@ -610,23 +618,15 @@ function DashboardContent() {
                                             <div className="flex justify-between items-start gap-2">
                                                 <span className="text-[9px] sl-text-dim font-bold uppercase tracking-wider">Arc</span>
                                                 <span className="text-[10px] font-black text-right leading-tight text-[#60a5fa]">
-                                                    {arc.arc}
+                                                    {currentStoryline.arc}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between items-start gap-2">
                                                 <span className="text-[9px] sl-text-dim font-bold uppercase tracking-wider">Boss</span>
                                                 <span className="text-[10px] font-black text-red-500/80 text-right leading-tight">
-                                                    {arc.boss}
+                                                    {currentStoryline.boss}
                                                 </span>
                                             </div>
-                                            {arc.unlocks && (
-                                                <div className="flex justify-between items-center gap-2 pt-1 border-t border-[rgba(30,68,200,0.15)]">
-                                                    <span className="text-[9px] sl-text-dim font-bold uppercase tracking-wider">Unlocks</span>
-                                                    <span className="text-[9px] font-black text-[#A480F2]/70 tracking-wider">
-                                                        {arc.unlocks}
-                                                    </span>
-                                                </div>
-                                            )}
                                         </div>
                                     );
                                 })()}
