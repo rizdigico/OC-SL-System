@@ -9,7 +9,11 @@
       "Bash(claude:*)",
       "Bash(npx next:*)",
       "Bash(grep:*)",
-      "mcp__qmd__query"
+      "mcp__qmd__query",
+      "Bash(git -C /mnt/c/Users/aariz/Documents/The-System cat-file -e HEAD)",
+      "Bash(git -C /mnt/c/Users/aariz/Documents/The-System ls-files --others --ignored --exclude-standard)",
+      "Bash(git -C /mnt/c/Users/aariz/Documents/The-System status --short)",
+      "Bash(npm install:*)"
     ]
   }
 }

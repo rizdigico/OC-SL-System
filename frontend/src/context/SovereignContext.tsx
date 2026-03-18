@@ -1,53 +1,41 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React from "react";
+import useSWR from "swr";
 import type { SovereignState } from "@/app/api/sovereign/route";
 
-interface SovereignContextValue {
-    sovereign:        SovereignState | null;
-    /** Re-fetches sovereign state from the server (GET). Use on initial load or manual refresh. */
-    refreshSovereign: () => Promise<void>;
-    /** Directly overwrites sovereign state from a POST response body — no extra GET needed. */
-    updateSovereign:  (state: SovereignState) => void;
-}
+/* ── SWR fetcher — cache: "no-store" prevents Next.js from caching the response ── */
+const fetcher = (url: string) =>
+    fetch(url, { cache: "no-store" }).then((res) => res.json());
 
-const SovereignContext = createContext<SovereignContextValue>({
-    sovereign:        null,
-    refreshSovereign: async () => {},
-    updateSovereign:  () => {},
-});
+const SWR_KEY = "/api/sovereign";
 
-export function SovereignProvider({ children }: { children: React.ReactNode }) {
-    const [sovereign, setSovereign] = useState<SovereignState | null>(null);
-
-    const refreshSovereign = useCallback(async () => {
-        try {
-            // ?t= busts Next.js's internal fetch deduplication cache
-            const res = await fetch(`/api/sovereign?t=${Date.now()}`, { cache: "no-store" });
-            if (res.ok) setSovereign(await res.json());
-        } catch (err) {
-            console.error("[SovereignContext] Fetch failed:", err);
-        }
-    }, []);
-
-    // Direct setter — used by mutation callers to apply POST response without a second GET
-    const updateSovereign = useCallback((state: SovereignState) => {
-        setSovereign(state);
-    }, []);
-
-    useEffect(() => {
-        refreshSovereign();
-        const id = setInterval(refreshSovereign, 5000);
-        return () => clearInterval(id);
-    }, [refreshSovereign]);
-
-    return (
-        <SovereignContext.Provider value={{ sovereign, refreshSovereign, updateSovereign }}>
-            {children}
-        </SovereignContext.Provider>
-    );
-}
-
+/**
+ * Drop-in replacement for the old Context-based hook.
+ * SWR's global cache means every component calling useSovereign()
+ * shares the same data and polling interval — no Provider needed.
+ */
 export function useSovereign() {
-    return useContext(SovereignContext);
+    const { data: sovereign = null, mutate } = useSWR<SovereignState>(
+        SWR_KEY,
+        fetcher,
+        { refreshInterval: 2000, revalidateOnFocus: true },
+    );
+
+    /** Re-fetches sovereign state from the server (GET). */
+    const refreshSovereign = async () => {
+        await mutate();
+    };
+
+    /** Optimistically overwrites sovereign state from a POST response body — no extra GET needed. */
+    const updateSovereign = (state: SovereignState) => {
+        mutate(state, { revalidate: false });
+    };
+
+    return { sovereign, refreshSovereign, updateSovereign };
+}
+
+/* ── Passthrough Provider — kept so dashboard/page.tsx JSX doesn't need changes ── */
+export function SovereignProvider({ children }: { children: React.ReactNode }) {
+    return <>{children}</>;
 }
