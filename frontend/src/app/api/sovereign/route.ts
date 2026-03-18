@@ -43,6 +43,8 @@ export interface SovereignState {
     inventory:       InventoryItem[];
     alerts:          SovereignAlert[];
     quests:          SovereignQuest[];
+    clearedDungeons: string[];
+    skills:          string[];
 }
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
@@ -65,6 +67,8 @@ const DEFAULT_STATE: SovereignState = {
     inventory:       [],
     alerts:          [],
     quests:          [],
+    clearedDungeons: [],
+    skills:          [],
 };
 
 const REDIS_KEY   = "sovereign_state";
@@ -124,10 +128,12 @@ function parseState(raw: string | null): SovereignState {
         return {
             ...DEFAULT_STATE,
             ...p,
-            gold:      p.gold      ?? DEFAULT_STATE.gold,
-            inventory: Array.isArray(p.inventory) ? p.inventory : [],
-            alerts:    Array.isArray(p.alerts)    ? p.alerts    : [],
-            quests:    Array.isArray(p.quests)    ? p.quests    : [],
+            gold:            p.gold      ?? DEFAULT_STATE.gold,
+            inventory:       Array.isArray(p.inventory)       ? p.inventory       : [],
+            alerts:          Array.isArray(p.alerts)          ? p.alerts          : [],
+            quests:          Array.isArray(p.quests)          ? p.quests          : [],
+            clearedDungeons: Array.isArray(p.clearedDungeons) ? p.clearedDungeons : [],
+            skills:          Array.isArray(p.skills)          ? p.skills          : [],
         };
     } catch {
         return { ...DEFAULT_STATE };
@@ -341,6 +347,42 @@ export async function POST(req: NextRequest) {
                 if (!state.quests.find(q => q.id === id))
                     state = { ...state, quests: [...state.quests, newQuest] };
 
+            } else if (action === "clearDungeon") {
+                const { dungeonId } = body as { dungeonId?: string };
+                if (!dungeonId) throw { userError: true, msg: "clearDungeon requires: dungeonId", status: 422 };
+                if (state.clearedDungeons.includes(dungeonId))
+                    throw { userError: true, msg: "Dungeon already cleared", status: 422 };
+
+                if (dungeonId === "hapjeong_subway") {
+                    const venomFang: InventoryItem = {
+                        id:          "kasaka_venom_fang",
+                        name:        "Kasaka's Venom Fang",
+                        type:        "gear",
+                        description: "A deadly fang harvested from the Blue Venom-Fang Kasaka. Radiates dark energy.",
+                        effect:      { str: 15 },
+                        quantity:    1,
+                        equipped:    false,
+                    };
+                    state = processLevelUp({
+                        ...state,
+                        exp:             state.exp + 3000,
+                        inventory:       [...state.inventory, venomFang],
+                        clearedDungeons: [...state.clearedDungeons, dungeonId],
+                    });
+                } else if (dungeonId === "dungeon_prisoners") {
+                    state = processLevelUp({
+                        ...state,
+                        exp:             state.exp + 5000,
+                        skills:          [...state.skills, "Stealth", "Bloodlust"],
+                        clearedDungeons: [...state.clearedDungeons, dungeonId],
+                    });
+                } else {
+                    state = processLevelUp({
+                        ...state,
+                        clearedDungeons: [...state.clearedDungeons, dungeonId],
+                    });
+                }
+
             } else {
                 throw { userError: true, msg: "Unknown action", status: 422 };
             }
@@ -348,7 +390,7 @@ export async function POST(req: NextRequest) {
             // WRITE — same connection, same socket, no gap
             const json = JSON.stringify(state);
             await client.set(REDIS_KEY, json);
-            console.log(`[SOVEREIGN POST] ${action} OK — ${json.length}b — gold=${state.gold} inv=${state.inventory.length} alerts=${state.alerts.length} quests=${state.quests.length}`);
+            console.log(`[SOVEREIGN POST] ${action} OK — ${json.length}b — gold=${state.gold} inv=${state.inventory.length} alerts=${state.alerts.length} quests=${state.quests.length} dungeons=${state.clearedDungeons.length} skills=${state.skills.length}`);
 
             return state;
         });

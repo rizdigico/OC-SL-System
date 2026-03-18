@@ -13,7 +13,7 @@ import { PlayerInventory } from "@/components/economy/PlayerInventory";
 import VerificationModal from "@/components/dungeon/VerificationModal";
 import { SkillMatrix } from "@/components/SkillMatrix";
 import { BossRoom } from "@/components/BossRoom";
-import { DungeonSystem } from "@/components/dungeon/DungeonSystem";
+import { MainStoryline } from "@/components/MainStoryline";
 import { CombatArena } from "@/components/CombatArena";
 import { JobChangeDungeon } from "@/components/JobChangeDungeon";
 import { DemonCastle } from "@/components/DemonCastle";
@@ -704,7 +704,7 @@ function DashboardContent() {
                             {activeView === 'command' ? (
                                 <ThroneRoom user={user} isPenaltyZone={isPenaltyZone} onClearPenalty={() => setIsPenaltyZone(false)} />
                             ) : activeView === 'dungeon' ? (
-                                <DungeonSystem userLevel={user?.stats?.level ?? 1} />
+                                <MainStoryline />
                             ) : (
                                 <div className="sl-panel">
                                     <span className="sl-corner-tl"/><span className="sl-corner-tr"/>

@@ -116,6 +116,7 @@ const SOVEREIGN_DEFAULTS: SovereignState = {
     hp: 900, maxHp: 900, fatigue: 12,
     str: 40, agi: 35, vit: 40, int: 60, per: 30, availablePoints: 5,
     gold: 5000, inventory: [], alerts: [], quests: [],
+    clearedDungeons: [], skills: [],
 };
 
 function parseSovereignState(raw: string | null): SovereignState {
@@ -125,8 +126,10 @@ function parseSovereignState(raw: string | null): SovereignState {
         return {
             ...SOVEREIGN_DEFAULTS,
             ...p,
-            gold:      p.gold      ?? SOVEREIGN_DEFAULTS.gold,
-            inventory: Array.isArray(p.inventory) ? p.inventory : [],
+            gold:            p.gold      ?? SOVEREIGN_DEFAULTS.gold,
+            inventory:       Array.isArray(p.inventory)       ? p.inventory       : [],
+            clearedDungeons: Array.isArray(p.clearedDungeons) ? p.clearedDungeons : [],
+            skills:          Array.isArray(p.skills)          ? p.skills          : [],
         };
     } catch {
         return { ...SOVEREIGN_DEFAULTS };
