@@ -13,8 +13,6 @@ interface DevPanelProps {
 }
 
 export function DevPanel({ isPenaltyZone = false, onForcePenalty, onClearPenalty }: DevPanelProps) {
-    if (process.env.NODE_ENV !== "development") return null;
-
     const router = useRouter();
     const { updateSovereign } = useSovereign();
     const [collapsed,   setCollapsed]   = useState(false);
